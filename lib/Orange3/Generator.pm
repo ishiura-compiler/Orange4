@@ -243,7 +243,6 @@ sub generate_statement {
     my ($self, $depth, $rest_of_roots, $path) = @_;
 	
 	my $statements = [];
-	my $st_type_rand = int(rand 10);
 	my $root_use_num;
 	my $nest_path = 1;
 	
@@ -258,6 +257,7 @@ sub generate_statement {
 		
 		$rest_of_roots -= $root_use_num;
 		
+		my $st_type_rand = int(rand 10);
 		if( $depth <= scalar(@{$self->{config}->get('loop_var_name')}) &&
 			$st_type_rand > 7 &&
 			$root_use_num >= 3) {
