@@ -212,14 +212,12 @@ sub generate_program {
 	#$C_PROGRAM_2 .= ( $check eq "" ) ? "" : $check . "";
 	#print Dumper $test;
 	#<STDIN>;
-
-	$C_PROGRAM_2 .= '	printf("@OK@\n")';
 	
 my $C_PROGRAM = <<"__END__";
 $C_PROGRAM_1
 $main_type main (void)      
 {
-$C_PROGRAM_2;
+$C_PROGRAM_2
 	return $retval;
 }
 __END__
@@ -357,8 +355,9 @@ sub generate_assign_statement {
 			$specifier = $self->{config}->get('type')->{$type}->{printf_format};
 			$COMPARE   = "$test_name == $val";
 			$fmt       = "\"@{[$specifier]}\"";
-			$check .= "\tif ($COMPARE) { OK(); } ";
-			$check .= "else { NG($fmt, t$self->{tval_count}); }\n";
+			$test .= "$tab";
+			$test .= "if ($COMPARE) { OK(); } ";
+			$test .= "else { NG($fmt, t$self->{tval_count}); }\n";
 		}
 		$self->{tval_count}++;
 	}
