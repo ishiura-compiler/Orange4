@@ -21,7 +21,7 @@ sub _check_structure {
 		if ( defined( $root_i->{st_type} ) ) {
 			if( $root_i->{st_type} eq 'for' ) {
 				unless (defined ($root_i->{loop_var_name})) { Carp::croak("undefined loop_var_name($i)"); }
-				unless (defined ($root_i->{init_val})) { Carp::croak("undefined init_st($i)"); }
+				unless (defined ($root_i->{init_st})) { Carp::croak("undefined init_st($i)"); }
 				unless (defined ($root_i->{continuation_cond})) { Carp::croak("undefined continuation_cond($i)"); }
 				unless (defined ($root_i->{re_init_st})) { Carp::croak("undefined re_init_st($i)"); }
 				unless (defined ($root_i->{inequality_sign})) { Carp::croak("undefined inequality_sign($i)"); }
@@ -37,7 +37,7 @@ sub _check_structure {
 				&& $root_i->{print_statement} )
 				{
 					if ( $root_i->{var}->{type} eq $root_i->{type} ) { ; }
-					else { Carp::croak("type ne assgign-var-type($i)"); }
+					else { print Dumper $root_i; <STDIN>;Carp::croak("type ne assgign-var-type($i)"); }
 					if ( $root_i->{var}->{val} eq $root_i->{val} ) { ; }
 					else { Carp::croak("val ne assgign-var-val($i)"); }
 					if ( defined( $root_i->{root}->{out}->{type} ) ) { ; }
@@ -221,7 +221,6 @@ $C_PROGRAM_2
 	return $retval;
 }
 __END__
-	
 	system "rm -f $config->{source_file} > /dev/null";
 	my $source_file = $self->{config}->get('source_file');
 	open( OUT, ">$source_file" );
@@ -229,7 +228,6 @@ __END__
 	close OUT;
 	$self->{program} = $C_PROGRAM;
 }
-
 
 sub generate_for_statement {
 	my ($self, $statement, $varset, $tab) = @_;

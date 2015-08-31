@@ -207,7 +207,6 @@ sub _randomtest {
     if ( $compiler->error_msg eq 0 ) {    #TODO msg should be undef or ''
       $executor->run;
     }
-
     if ( $compiler->error_msg ne 0 || $executor->error != 0 ) {
       my $header = $self->_error_header(
         $compiler->command, $compiler->error_msg,

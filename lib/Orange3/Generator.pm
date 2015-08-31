@@ -281,7 +281,7 @@ sub generate_statement {
 				$continuation_cond->{val} = 1;
 				$re_init_st = $self->generate_expressions(0);
 				$re_init_st->{type} = 'int';
-				$re_init_st->{val} = 0;
+				$re_init_st->{val} = 1;
 				$inequality_sign = '<';
 				
 				if ( $path == 0 ) { $nest_path = 0; }
@@ -297,7 +297,7 @@ sub generate_statement {
 				$continuation_cond->{val} = 0;
 				$re_init_st = $self->generate_expressions(0);
 				$re_init_st->{type} = 'int';
-				$re_init_st->{val} = 0;
+				$re_init_st->{val} = 1;
 				$inequality_sign = '<';
 				
 				$nest_path = 0;
@@ -380,6 +380,7 @@ sub generate_statement {
 					type	=> $expression->{type},
 					val		=> $expression->{val},
 					root	=> $expression->{root},
+					var		=> $expression->{var},
 					print_statement => 1,
 				};
 				push @$statements, $assign;
@@ -418,12 +419,21 @@ sub generate_expressions {
     if ($undef_root > 0) {
         push @{$self->{undef_seeds}}, $self->{seed} if $self->{config}->get('debug_mode');
     }
-	
-	return +{
-		type => $self->{root}->{out}->{type},
-		val => $self->{root}->{out}->{val},
-		root => $self->{root},
-	};
+	if ( $gen_tvar ) {
+		return +{
+			type => $self->{root}->{out}->{type},
+			val  => $self->{root}->{out}->{val},
+			root => $self->{root},
+			var  => $self->{vars}->[$#{$self->{vars}}],
+		};
+	}
+	else {
+		return +{
+			type => $self->{root}->{out}->{type},
+			val => $self->{root}->{out}->{val},
+			root => $self->{root},
+		};
+	}
 }
 
 sub generate_expression {
