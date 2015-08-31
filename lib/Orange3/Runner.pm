@@ -15,6 +15,7 @@ use Orange3::Config;
 use Orange3::Dumper;
 use Orange3::Generator;
 use Orange3::Generator::Program;
+use Orange3::Generator::Program4;
 use Orange3::Log;
 use Orange3::Runner::Compiler;
 use Orange3::Runner::Executor;
@@ -185,10 +186,10 @@ sub _randomtest {
   my $config = $self->{config};
 
   my $test_ng = 0;
-
+  
   my ( $varset, $roots ) = $self->_generate_vars_and_roots;
-
-  my $generator = Orange3::Generator::Program->new($config);
+  
+  my $generator = Orange3::Generator::Program4->new($config);
   $generator->generate_program( $varset, $roots );
 
   for my $option ( @{ $config->get('options') } ) {

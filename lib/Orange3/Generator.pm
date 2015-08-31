@@ -5,6 +5,7 @@ use warnings;
 
 use Carp ();
 use Math::BigInt;
+use Data::Dumper;
 
 use Orange3::Dumper;
 use Orange3::Log;
@@ -31,8 +32,8 @@ sub run {
   my $self = shift;
 
   $self->_init();
-  $self->generate_random_vars();
-  $self->generate_expressions();
+  $self->generate_x_vars();
+  $self->generate_statements();
 
   unless ( $self->{config}->get('debug_mode') ) {
     local $| = 1;
@@ -49,6 +50,7 @@ sub _init {
   $self->{expression_size} = _get_expression_size( $self->{config} );
   $self->_get_root_size();
   $self->_get_var_size();
+  $self->{tval_count} = 0;
 }
 
 sub _get_expression_size {
@@ -81,11 +83,11 @@ sub _get_var_size {
     int( ( $var_num_max - $var_num_min + 1 ) * rand() + $var_num_min );
 }
 
-sub generate_random_vars {
+sub generate_x_vars {
   my $self = shift;
 
   for my $number ( 0 .. $self->{var_max} ) {
-    my $var = $self->_generate_random_var($number);
+    my $var = $self->_generate_x_var($number);
     if ( defined( $self->{volatile_mode} )
       && $var->{scope} =~ /GLOBAL/
       && !( $var->{modifier} =~ /(const|volatile)/ ) )
@@ -108,7 +110,7 @@ sub generate_random_vars {
   }
 }
 
-sub _generate_random_var {
+sub _generate_x_var {
   my ( $self, $number ) = @_;
 
   my $config = $self->{config};
@@ -154,6 +156,7 @@ sub _generate_value {
 
 sub generate_t_var {
   my ( $self, $type, $value, $tval_count ) = @_;
+  
   return +{
     name_type => 't',
     name_num  => $tval_count,
@@ -207,73 +210,220 @@ sub _random_change_sign {
   return $value;
 }
 
-sub generate_expressions {
-  my $self = shift;
-
-  my $undef_root = 0;
-
-  for my $root ( 0 .. $self->{root_max} - 1 ) {
-    unless ( $self->{config}->get('debug_mode') ) {    #unless or if??
-      if ( ( $root + 1 ) % 50 == 1 ) {
-        local $| = 1;
-        print "seed : $self->{seed}\t";
-        print "generate exp now.. (", $root + 1, "/$self->{root_max})";
-        print "\r";
-        local $| = 0;
-      }
-    }
-
-    my $statement = $self->generate_statement();
-
-    do {
-      my $expression_size = $self->{expression_size};
-      $self->generate_expression( $expression_size, 32 );
-      $self->type_compute( $self->{root} );
-
-      for ( 1 .. 100 ) {
-        Orange3::Generator::Expect::value_compute(
-          $self->{root},   $self->{vars},
-          $self->{config}, $self->{avoide_undef}
-        );
-
-        if ( $self->{root}->{out}->{val} ne "UNDEF" ) {
-          last;
-        }
-        else {
-          $undef_root = 1;
-        }
-      }
-    } while ( $self->{root}->{out}->{val} eq "UNDEF" );
-
-    push @{ $self->{vars} },
-      $self->generate_t_var( $self->{root}->{out}->{type},
-      $self->{root}->{out}->{val}, $root );
-    $statement->{root}            = $self->{root};
-    $statement->{type}            = $self->{root}->{out}->{type};
-    $statement->{val}             = $self->{root}->{out}->{val};
-    $statement->{print_statement} = 1;
-    $statement->{var}             = $self->{vars}->[ $#{ $self->{vars} } ];
-    push @{ $self->{roots} }, $statement;
-
-  }
-
-  if ( $undef_root > 0 ) {
-    push @{ $self->{undef_seeds} }, $self->{seed}
-      if $self->{config}->get('debug_mode');
-  }
+sub generate_statements {
+    my $self = shift;
+	
+    my $undef_root = 0;
+	
+	my $rest_of_roots = $self->{root_max};
+	
+	# ループ変数の名前の数字を初期化
+	for ( 0 .. scalar(@{$self->{config}->get('loop_var_name')}) - 1 ) {
+		$self->{loop_var_name_num}->[$_] = 0;
+	}
+	
+	my $statements = $self->generate_statement(1, $rest_of_roots, 1);
+	if( ref($statements) eq 'ARRAY' ) {
+		push @{$self->{roots}}, @$statements;
+	}
+	else {
+		push @{$self->{roots}}, $statements;
+	}
+	
+	unless ($self->{config}->get('debug_mode')) { #unless or if??
+		local $| = 1;
+		print "seed : $self->{seed}\t";
+		print "generate statements now.. (", $self->{root_max} - $rest_of_roots, "/$self->{root_max})";
+		print "\r";
+		local $| = 0;
+	}
 }
 
 sub generate_statement {
-  my $self = shift;
+    my ($self, $depth, $rest_of_roots, $path) = @_;
+	
+	my $statements = [];
+	my $st_type_rand = int(rand 10);
+	my $root_use_num;
+	my $nest_path = 1;
+	
+	do {
+		# ブロック内の式数がかたよらないように調整
+		if ( $rest_of_roots < 20 ) {
+			$root_use_num = int(rand($rest_of_roots-1)) + 1;
+		}
+		else {
+			$root_use_num = int(rand(19)) + 1;
+		}
+		
+		$rest_of_roots -= $root_use_num;
+		
+		if( $depth <= scalar(@{$self->{config}->get('loop_var_name')}) &&
+			$st_type_rand > 7 &&
+			$root_use_num >= 3) {
+			my $st_type = 'for';
+			my $loop_var_name = $self->{config}->get('loop_var_name');
+			my $name = "$loop_var_name->[$depth-1]" . "$self->{loop_var_name_num}->[$depth-1]";
+			my $init_st;
+			my $continuation_cond;
+			my $re_init_st;
+			my $inequality_sign;
+			
+			# forは2種類
+			my $type = int(rand(2));
+			if( $type == 0 ) { # ループ回数1回
+				#暫定
+				$init_st = $self->generate_expressions(0);
+				$init_st->{type} = 'int';
+				$init_st->{val} = 0;
+				$continuation_cond = $self->generate_expressions(0);
+				$continuation_cond->{type} = 'int';
+				$continuation_cond->{val} = 1;
+				$re_init_st = $self->generate_expressions(0);
+				$re_init_st->{type} = 'int';
+				$re_init_st->{val} = 0;
+				$inequality_sign = '<';
+				
+				if ( $path == 0 ) { $nest_path = 0; }
+				else { $nest_path = 1; }
+			}
+			else { # ループ回数0回
+				#暫定
+				$init_st = $self->generate_expressions(0);
+				$init_st->{type} = 'int';
+				$init_st->{val} = 0;
+				$continuation_cond = $self->generate_expressions(0);
+				$continuation_cond->{type} = 'int';
+				$continuation_cond->{val} = 0;
+				$re_init_st = $self->generate_expressions(0);
+				$re_init_st->{type} = 'int';
+				$re_init_st->{val} = 0;
+				$inequality_sign = '<';
+				
+				$nest_path = 0;
+			}
+			
+			my $body = $self->generate_statement($depth+1, $root_use_num - 3, $nest_path);
+			
+			my $st = +{
+				st_type 			=> $st_type,
+				loop_var_name	 	=> $name,
+				init_st				=> $init_st,
+				continuation_cond	=> $continuation_cond,
+				re_init_st			=> $re_init_st,
+				inequality_sign		=> $inequality_sign,
+				statements			=> $body,
+			};
+			
+			push @$statements, $st;
+		}
+		elsif( $st_type_rand <= 7 && $st_type_rand > 5 && $root_use_num >= 1 ) {
+			my $st_type = 'if';
+			my $exp_cond;
+			my $st_then;
+			my $st_else;
+			
+			# ifは4種類
+			my $type = int(rand(4));
+			if ( $type == 0 ) { # ifのみ && 真
+				$exp_cond = $self->generate_expressions(0);
+				$exp_cond->{type} = 'int';
+				$exp_cond->{val} = 1;
+				if ( $path == 0 ) { $nest_path = 0; }
+				else { $nest_path = 1; }
+				$st_then = $self->generate_statement($depth+1, $root_use_num - 1, $nest_path);
+				$st_else = [];
+			}
+			elsif ( $type == 1 ) { # ifのみ && 偽
+				$exp_cond = $self->generate_expressions(0);
+				$exp_cond->{type} = 'int';
+				$exp_cond->{val} = 0;
+				$nest_path = 0;
+				$st_then = $self->generate_statement($depth+1, $root_use_num - 1, $nest_path);
+				$st_else = [];
+			}
+			elsif ( $type == 2 ) { # elseあり && 真
+				$exp_cond = $self->generate_expressions(0);
+				$exp_cond->{type} = 'int';
+				$exp_cond->{val} = 1;
+				if ( $path == 0 ) { $nest_path = 0; }
+				else { $nest_path = 1; }
+				$st_then = $self->generate_statement($depth+1, $root_use_num - 1, $nest_path);
+				$st_else = $self->generate_statement($depth+1, $root_use_num - 1, 0);
+			}
+			else { # elseあり && 偽
+				$exp_cond = $self->generate_expressions(0);
+				$exp_cond->{type} = 'int';
+				$exp_cond->{val} = 0;
+				if ( $path == 0 ) { $nest_path = 0; }
+				else { $nest_path = 1; }
+				$st_then = $self->generate_statement($depth+1, $root_use_num - 1, 0);
+				$st_else = $self->generate_statement($depth+1, $root_use_num - 1, $nest_path);
+			}
+			
+			my $st = +{
+				st_type  => $st_type,
+				exp_cond => $exp_cond,
+				st_then  => $st_then,
+				st_else  => $st_else,
+			};
+			
+			push @$statements, $st;
+		}
+		else {
+			for(0 .. $root_use_num) {
+				my $st_type = 'assign';
+				my $expression = $self->generate_expressions(1);
+				my $assign = +{
+					st_type	=> $st_type,
+					path	=> $path,
+					type	=> $expression->{type},
+					val		=> $expression->{val},
+					root	=> $expression->{root},
+					print_statement => 1,
+				};
+				push @$statements, $assign;
+			}
+		}
+	} while ($rest_of_roots > 0 );
+	
+	return $statements;
+}
 
-  my $st_type = 'assign';    #'assign', 'if', 'for'...
-
-  return +{
-    type    => undef,
-    val     => undef,
-    st_type => $st_type,
-    root    => undef,
-  };
+sub generate_expressions {
+	my ($self, $gen_tvar) = @_;
+	
+    my $undef_root = 0;
+	
+	my $expression_size = $self->{expression_size};
+	$self->generate_expression($expression_size, 32);
+	
+	$self->type_compute($self->{root});
+	
+	Orange3::Generator::Expect::value_compute(
+		$self->{root}, $self->{vars}, $self->{config}, $self->{avoide_undef}
+	);
+	
+	my $val = $self->{root}->{out}->{val};
+	
+	if ( $gen_tvar ) {
+		push @{$self->{vars}}, $self->generate_t_var(
+			$self->{root}->{out}->{type},
+			$self->{root}->{out}->{val},
+			$self->{tval_count},
+		);
+		$self->{tval_count}++;
+	}
+	
+    if ($undef_root > 0) {
+        push @{$self->{undef_seeds}}, $self->{seed} if $self->{config}->get('debug_mode');
+    }
+	
+	return +{
+		type => $self->{root}->{out}->{type},
+		val => $self->{root}->{out}->{val},
+		root => $self->{root},
+	};
 }
 
 sub generate_expression {
