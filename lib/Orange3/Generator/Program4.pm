@@ -236,7 +236,7 @@ sub generate_for_statement {
 	my $check = "";
 	$test .= "$tab" . "for( $statement->{loop_var_name} = $statement->{init_st}->{val}; ";
 	$test .= "$statement->{loop_var_name} $statement->{inequality_sign} $statement->{continuation_cond}->{val}; ";
-	$test .= "$statement->{loop_var_name} += $statement->{re_init_st}->{val})\n";
+	$test .= "$statement->{loop_var_name} $statement->{operator} $statement->{re_init_st}->{val})\n";
 	$test .= "$tab" . "{\n";
 	
 	push @{$self->{used_loop_var_name_tmp}}, $statement->{loop_var_name};
@@ -346,7 +346,7 @@ sub generate_assign_statement {
 		#$test .= "$tab$test_name = @{[$self->tree_sprint($statement->{root})]};\n";
 		$test .= "$tab$test_name = $statement->{root}->{out}->{val};\n";
 		
-		if ( $statement->{print_statement} == 1 ) {
+		if ( $statement->{print_statement} == 1 && $statement->{path} == 1) {
 			my $val = Math::BigInt->new(0);
 			$val = $self->val_with_suffix( $statement->{root}->{out}->{val},
 			$statement->{root}->{out}->{type} );

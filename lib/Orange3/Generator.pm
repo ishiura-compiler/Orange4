@@ -263,42 +263,79 @@ sub generate_statement {
 			$root_use_num >= 3) {
 			my $st_type = 'for';
 			my $loop_var_name = $self->{config}->get('loop_var_name');
-			my $name = "$loop_var_name->[$depth-1]" . "$self->{loop_var_name_num}->[$depth-1]";
+			my $name_type = "$loop_var_name->[$depth-1]";
+			my $name_num = "$self->{loop_var_name_num}->[$depth-1]";
 			my $init_st;
 			my $continuation_cond;
 			my $re_init_st;
 			my $inequality_sign;
-			
+			my $operator;
 			# forは2種類
-			my $type = int(rand(2));
-			if( $type == 0 ) { # ループ回数1回
-				#暫定
+			my $loop_type = int(rand(2));
+			if( $loop_type == 0 ) { # ループ回数1回
 				$init_st = $self->generate_expressions(0);
-				$init_st->{type} = 'int';
-				$init_st->{val} = 0;
+				$init_st->{type} = 'signed int';
+				$init_st->{val} = $self->define_value( $init_st->{type} );
 				$continuation_cond = $self->generate_expressions(0);
-				$continuation_cond->{type} = 'int';
-				$continuation_cond->{val} = 1;
+				$continuation_cond->{type} = $init_st->{type};
+				$continuation_cond->{val} = $self->define_value( $init_st->{type} );
 				$re_init_st = $self->generate_expressions(0);
-				$re_init_st->{type} = 'int';
-				$re_init_st->{val} = 1;
-				$inequality_sign = '<';
+				$re_init_st->{type} = $init_st->{type};
+				if ( int(rand(2)) ) {
+					$operator = '+=';
+					$re_init_st->{val} = $continuation_cond->{val} - $init_st->{val};
+				}
+				else {
+					$operator = '-=';
+					$re_init_st->{val} = $init_st->{val} - $continuation_cond->{val};
+				}
+				if ( $init_st->{val} == $continuation_cond->{val} ) {
+					if ( $init_st->{val} == $self->{config}->get('type')->{$init_st->{type}}->{max} ) {
+						$inequality_sign = '>=';
+						$operator = '-=';
+						$re_init_st->{val} = 1;
+					}
+					else {
+						$inequality_sign = '<=';
+						$operator = '+=';
+						$re_init_st->{val} = 1;
+					}
+				}
+				if ( $init_st->{val} > $continuation_cond->{val} ) {
+					$inequality_sign = '>';
+				}
+				else {
+					$inequality_sign = '<';
+				}
+				
 				
 				if ( $path == 0 ) { $nest_path = 0; }
 				else { $nest_path = 1; }
 			}
 			else { # ループ回数0回
-				#暫定
 				$init_st = $self->generate_expressions(0);
-				$init_st->{type} = 'int';
-				$init_st->{val} = 0;
+				#$init_st->{type} = random_select( $self->{config}->get('types') );
+				$init_st->{type} = 'signed int';
+				$init_st->{val} = $self->define_value( $init_st->{type} );
 				$continuation_cond = $self->generate_expressions(0);
-				$continuation_cond->{type} = 'int';
-				$continuation_cond->{val} = 0;
+				$continuation_cond->{type} = $init_st->{type};
+				$continuation_cond->{val} = $self->define_value( $init_st->{type} );
 				$re_init_st = $self->generate_expressions(0);
-				$re_init_st->{type} = 'int';
-				$re_init_st->{val} = 1;
-				$inequality_sign = '<';
+				$re_init_st->{type} = $init_st->{type};
+				if ( $init_st->{val} > $continuation_cond->{val} ) {
+					$inequality_sign = '<=';
+				}
+				else {
+					$inequality_sign = '>';
+				}
+				if ( int(rand(2)) ) {
+					$operator = '+=';
+					$re_init_st->{val} = $continuation_cond->{val} - $init_st->{val};
+				}
+				else {
+					$operator = '-=';
+					$re_init_st->{val} = $init_st->{val} - $continuation_cond->{val};
+				}
 				
 				$nest_path = 0;
 			}
@@ -307,11 +344,12 @@ sub generate_statement {
 			
 			my $st = +{
 				st_type 			=> $st_type,
-				loop_var_name	 	=> $name,
+				loop_var_name	 	=> $name_type . $name_num,
 				init_st				=> $init_st,
 				continuation_cond	=> $continuation_cond,
 				re_init_st			=> $re_init_st,
 				inequality_sign		=> $inequality_sign,
+				operator			=> $operator,
 				statements			=> $body,
 			};
 			
@@ -324,17 +362,18 @@ sub generate_statement {
 			my $st_else;
 			
 			# ifは4種類
-			my $type = int(rand(4));
-			if ( $type == 0 ) { # ifのみ && 真
+			my $if_type = int(rand(4));
+			if ( $if_type == 0 ) { # ifのみ && 真
 				$exp_cond = $self->generate_expressions(0);
-				$exp_cond->{type} = 'int';
-				$exp_cond->{val} = 1;
+				$exp_cond->{type} = random_select( $self->{config}->get('types') ),;
+				$exp_cond->{val} = $self->define_value( $exp_cond->{type} );
+				if ( $exp_cond->{val} == 0 ) { $exp_cond->{val} = 1; }
 				if ( $path == 0 ) { $nest_path = 0; }
 				else { $nest_path = 1; }
 				$st_then = $self->generate_statement($depth+1, $root_use_num - 1, $nest_path);
 				$st_else = [];
 			}
-			elsif ( $type == 1 ) { # ifのみ && 偽
+			elsif ( $if_type == 1 ) { # ifのみ && 偽
 				$exp_cond = $self->generate_expressions(0);
 				$exp_cond->{type} = 'int';
 				$exp_cond->{val} = 0;
@@ -342,10 +381,11 @@ sub generate_statement {
 				$st_then = $self->generate_statement($depth+1, $root_use_num - 1, $nest_path);
 				$st_else = [];
 			}
-			elsif ( $type == 2 ) { # elseあり && 真
+			elsif ( $if_type == 2 ) { # elseあり && 真
 				$exp_cond = $self->generate_expressions(0);
-				$exp_cond->{type} = 'int';
-				$exp_cond->{val} = 1;
+				$exp_cond->{type} = random_select( $self->{config}->get('types') ),;
+				$exp_cond->{val} = $self->define_value( $exp_cond->{type} );
+				if ( $exp_cond->{val} == 0 ) { $exp_cond->{val} = 1; }
 				if ( $path == 0 ) { $nest_path = 0; }
 				else { $nest_path = 1; }
 				$st_then = $self->generate_statement($depth+1, $root_use_num - 1, $nest_path);
