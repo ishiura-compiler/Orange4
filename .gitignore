@@ -46,3 +46,4 @@ MYMETA.*
 !META.json
 
 *.tmp
+.DS_Store

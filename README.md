@@ -1,14 +1,14 @@
 # NAME
 
-Orange3 - Randomtest of C compilers
+Orange4 - Randomtest of C compilers
 
-# About "Orange3"
+# About "Orange4"
 
-Orange3 is a system to test validity of C compilers by randomly
+Orange4 is a system to test validity of C compilers by randomly
 generated programs.  It currently aims at testing optimization
 regarding arithmetic expressions.
 
-Orange3 has been developed by the following persons at the compiler
+Orange4 has been developed by the following persons at the compiler
 team of Ishiura Laboratory, School of science and Technology, Kwansei
 Gakuin University <ishiura-compiler@ml.kwansei.ac.jp>
 
@@ -31,12 +31,12 @@ Please try the following command sequence.
     $ ./Build install
 
     * Internet connection is required.
-    * If error occurs during installation, please remove Orange3 and re-download.
+    * If error occurs during installation, please remove Orange4 and re-download.
     * If copy error occurs during installation, please retry.
 
-# CONFIGURATION FILES OF Orange3
+# CONFIGURATION FILES OF Orange4
 
-To use orange3, users need to specify settings in the three
+To use Orange4, users need to specify settings in the three
 configuration files.  In the case of the “i386\_Cygwin” target.
 for example, the configuration files are:
 
@@ -51,11 +51,11 @@ I/O support, you just need to edit several lines.
 
 # SYNOPSIS
 
-An "orange3" command repeats the process of generating a test program
+An "Orange4" command repeats the process of generating a test program
 and compile & executes it.  The number of tests or time for testing
 should be specified.
 
-    $ orange3 [-c config file] [options]
+    $ Orange4 [-c config file] [options]
 
     * OPTION
     
@@ -81,14 +81,14 @@ directories.
 
 # MINIMIZATION OF ERROR FILE
 
-Orange3 can reduce programs that detected errors by Orange3's minimizer.
+Orange4 can reduce programs that detected errors by Orange4's minimizer.
 
-# SYNOPSIS OF Orange3's MINIMIZER
+# SYNOPSIS OF Orange4's MINIMIZER
 
-"File" is a seed information file saved by orange3.  If "Directory" is
+"File" is a seed information file saved by Orange4.  If "Directory" is
 specified, add the Files in the directory and processed.
 
-    $ orange3-minimizer <File|Directory>
+    $ Orange4-minimizer <File|Directory>
 
 # LICENSE
 

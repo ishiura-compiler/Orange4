@@ -3,20 +3,20 @@ use warnings;
 
 use Test::More;
 
-use Orange3::Mini;
+use Orange4::Mini;
 
 subtest 'basic' => sub {
-    my $mini = Orange3::Mini->new();
+    my $mini = Orange4::Mini->new();
 
     ok $mini, 'constructor';
-    isa_ok $mini, 'Orange3::Mini';
+    isa_ok $mini, 'Orange4::Mini';
 
     can_ok $mini, 'parse_options';
     can_ok $mini, 'run';
 };
 
 subtest 'parse_options' => sub {
-    my $mini = Orange3::Mini->new();
+    my $mini = Orange4::Mini->new();
 
     subtest 'argv' => sub {
         eval {

@@ -21,8 +21,8 @@ my %args = (
         'Module::Build' => 0.38,
     },
 
-    name            => 'Orange3',
-    module_name     => 'Orange3',
+    name            => 'Orange4',
+    module_name     => 'Orange4',
     allow_pureperl => 0,
 
     script_files => [glob('script/*'), glob('config/.*')],

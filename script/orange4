@@ -1,0 +1,17 @@
+#!/usr/bin/perl
+
+use strict;
+use warnings;
+
+use File::Basename;
+use File::Spec ();
+
+use lib qw/lib/;
+
+use Orange4::Runner;
+
+my $scriptdir = File::Spec->rel2abs( dirname(__FILE__) );
+
+my $runner = Orange4::Runner->new($scriptdir);
+$runner->parse_options(@ARGV);
+$runner->run();

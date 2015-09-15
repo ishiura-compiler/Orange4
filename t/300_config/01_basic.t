@@ -3,7 +3,7 @@ use warnings;
 
 use Test::More;
 
-use Orange3::Config;
+use Orange4::Config;
 use t::Util qw/create_configfile/;
 
 my $test_config = {
@@ -18,9 +18,9 @@ my $test_config = {
 my $config_file = create_configfile($test_config);
 
 subtest 'basic' => sub {
-    my $config = Orange3::Config->new($config_file->filename);
+    my $config = Orange4::Config->new($config_file->filename);
 
-    isa_ok $config, 'Orange3::Config';
+    isa_ok $config, 'Orange4::Config';
     can_ok $config, 'get';
 
     subtest 'load config' => sub {

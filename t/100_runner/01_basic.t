@@ -3,18 +3,18 @@ use warnings;
 
 use Test::More;
 
-use Orange3::Runner;
+use Orange4::Runner;
 
 subtest 'basic' => sub {
-    my $runner = Orange3::Runner->new();
-    isa_ok $runner, 'Orange3::Runner';
+    my $runner = Orange4::Runner->new();
+    isa_ok $runner, 'Orange4::Runner';
 
     can_ok $runner, 'run';
     can_ok $runner, 'parse_options';
 
     subtest 'parse_options' => sub {
         subtest 'option: config' => sub {
-            $runner = Orange3::Runner->new();
+            $runner = Orange4::Runner->new();
             subtest 'short option' => sub {
                 $runner->parse_options(qw/-c hoge/);
                 ok $runner->{config_file};
@@ -29,7 +29,7 @@ subtest 'basic' => sub {
         }; 
 
         subtest 'option: count' => sub {
-            $runner = Orange3::Runner->new();
+            $runner = Orange4::Runner->new();
             subtest 'short option' => sub {
                 $runner->parse_options(qw/-n 100/);
                 ok $runner->{count};
@@ -38,7 +38,7 @@ subtest 'basic' => sub {
         }; 
 
         subtest 'option: seed' => sub {
-            $runner = Orange3::Runner->new();
+            $runner = Orange4::Runner->new();
             subtest 'short option' => sub {
                 $runner->parse_options(qw/-s 100/);
                 ok $runner->{start_seed};
@@ -53,7 +53,7 @@ subtest 'basic' => sub {
         }; 
 
         subtest 'option: time' => sub {
-            $runner = Orange3::Runner->new();
+            $runner = Orange4::Runner->new();
             subtest 'short option' => sub {
                 $runner->parse_options(qw/-t 100/);
                 ok $runner->{time};
@@ -68,7 +68,7 @@ subtest 'basic' => sub {
         }; 
 
         subtest 'option: help' => sub {
-            $runner = Orange3::Runner->new();
+            $runner = Orange4::Runner->new();
             subtest 'short option' => sub {
                 eval {
                     $runner->parse_options(qw/-h/);
@@ -85,7 +85,7 @@ subtest 'basic' => sub {
         }; 
 
         subtest 'die' => sub {
-            $runner = Orange3::Runner->new();
+            $runner = Orange4::Runner->new();
             eval {
                 $runner->parse_options(qw/-n 100 -t 100/);
             };
@@ -94,7 +94,7 @@ subtest 'basic' => sub {
     };
 
     subtest 'validate' => sub {
-        $runner = Orange3::Runner->new();
+        $runner = Orange4::Runner->new();
         $runner->parse_options();
         $runner->_validate();
         is $runner->{count}, 1, 'set default value'

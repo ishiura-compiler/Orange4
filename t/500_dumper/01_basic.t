@@ -5,33 +5,33 @@ use Test::More;
 
 use Math::BigInt;
 
-use Orange3::Dumper;
+use Orange4::Dumper;
 
 subtest 'basic' => sub {
-    my $dumper = Orange3::Dumper->new(
+    my $dumper = Orange4::Dumper->new(
         vars  => undef,
         roots => undef,
     );
-    isa_ok $dumper, 'Orange3::Dumper';
+    isa_ok $dumper, 'Orange4::Dumper';
     can_ok $dumper, 'vars_and_roots';
     can_ok $dumper, 'all';
 };
 
 subtest 'dies ok' => sub {
     eval {
-        Orange3::Dumper->new();
+        Orange4::Dumper->new();
     };
     like $@, qr/^Missing mandatory parameter:/, 'none both of parameters';
 
     eval {
-        Orange3::Dumper->new(
+        Orange4::Dumper->new(
             vars => undef,
         );
     };
     like $@, qr/Missing mandatory parameter: roots/, 'vars only';
 
     eval {
-        Orange3::Dumper->new(
+        Orange4::Dumper->new(
             roots => undef,
         );
     };
@@ -42,12 +42,12 @@ subtest 'bigint' => sub {
     my $num = '1234';
 
     my $value = Math::BigInt->new($num);
-    my $got = Orange3::Dumper::_bigint_dumper($value);
+    my $got = Orange4::Dumper::_bigint_dumper($value);
     my $expected = "'1234'";
     is $got, $expected, '+ is ok';
 
     my $value2 = Math::BigInt->new(-$num);
-    my $got2 = Orange3::Dumper::_bigint_dumper($value2);
+    my $got2 = Orange4::Dumper::_bigint_dumper($value2);
     my $expected2 = "'-1234'";
     is $got2, $expected2, '- is ok';
 };

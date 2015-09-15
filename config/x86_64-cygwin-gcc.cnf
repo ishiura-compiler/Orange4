@@ -1,39 +1,39 @@
 +{
   debug_mode => 0,
-
+  
   # Multiplication of number of operators and expressionis
-  e_size_num => 10,
-
+  e_size_num => 100,
+  
   # Option of the compiler, separated by commas
   options => [ "-O0", "-O3" ],
-
+  
   # Name of C file
   source_file => 'x86_64-cygwin-gcc-test.c',
-
+  
   # Name of Executable file
   exec_file => 'x86_64-cygwin-gcc-test.exe',
-
+  
   # Macro (OK) of C source
   macro_ok => 'printf("@OK@\n")',
-
+  
   # Macro (NG) of C source
-  macro_ng => 'printf("@NG@ (test = " fmt ")\n",val)',
-
+  macro_ng => 'printf("@NG@ ("test" = " fmt ")\n",val)',
+  
   # Command of the compiler
   compiler => 'gcc',
-
+  
   # Operators, separated by spaces
   operators => [
     qw(+ + + - - - * * * * * * / / / / / / % % % % % % << << << << << << >> >> >> >> >> >> == != < > <= >= && || | | | & & & ^ ^ ^)
   ],
-
+  
   # Storage classes, separated by commas
   classes => [ "static", "" ],
-
+  
   # Modifiers, separated by commas
   # ("const" is unused in some variables.)
   modifiers => [ "const", "volatile", "const volatile", "" ],
-
+  
   # Types, separated by commas
   types => [
     "signed char",
@@ -50,10 +50,14 @@
     "double",
     "long double",
   ],
-
+  
   # Scopes, separated by commas
   scopes => [ "LOCAL", "GLOBAL" ],
-
+  
+  # Loop value names
+  # can't use "k", "t", and "x"
+  loop_var_name => [ "i", "j", "l", "m", "n", "o" ],
+  
   # Details of types
   type => {
     "signed char" => {
@@ -138,27 +142,40 @@
     },
     "float" => {
       order         => 11,
-      printf_format => '%0.5e',
+      printf_format => '%0.42e',
       const_suffix  => 'F',
       bits          => 24,
       min           => -8388608,
       max           => 8388607,
+      e_min         => -126,
+      e_max         => 127,
+      p_min         => '1.175494350822287507968736537222245677818666e-38',
+      p_max         => '3.4028234663852885981170418348451692544e+38',
     },
     "double" => {
       order         => 12,
-      printf_format => '%0.15e',
+      printf_format => '%0.42e',
       const_suffix  => '',
       bits          => 53,
       min           => -4503599627370496,
       max           => 4503599627370495,
+      e_min         => -1022,
+      e_max         => 1023,
+      p_min         => '2.225073858507201383090232717332404064219216e-308',
+      p_max         => '1.797693134862315708145274237317043567980706e+308',
     },
     "long double" => {
       order         => 13,
-      printf_format => '%0.17Le',
+      printf_format => '%0.42Le',
       const_suffix  => 'L',
       bits          => 64,
       min           => '-9223372036854775808',
       max           => '9223372036854775807',
+      e_bits        => 15,
+      e_min         => -16382,
+      e_max         => 16383,
+      p_min         => '3.362103143112093506262677817321752602598079e-4932',
+      p_max         => '1.189731495357231765021263853030970205169063e+4932',
     },
   }
-  }
+}

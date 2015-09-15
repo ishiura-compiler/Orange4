@@ -4,8 +4,8 @@ use warnings;
 use Test::More;
 use List::MoreUtils qw/any/; #TODO recommend
 
-use Orange3::Config;
-use Orange3::Generator;
+use Orange4::Config;
+use Orange4::Generator;
 use t::Util qw/create_configfile/;
 
 my $test_config = {
@@ -77,12 +77,12 @@ my $test_config = {
 my $config_file = create_configfile($test_config);
 
 subtest 'basic' => sub {
-    my $generator = Orange3::Generator->new(
-        config => Orange3::Config->new($config_file->filename)
+    my $generator = Orange4::Generator->new(
+        config => Orange4::Config->new($config_file->filename)
     );
 
-    isa_ok $generator, 'Orange3::Generator';
-    isa_ok $generator->{config}, 'Orange3::Config';
+    isa_ok $generator, 'Orange4::Generator';
+    isa_ok $generator->{config}, 'Orange4::Config';
 
     can_ok $generator, 'run';
 
@@ -147,11 +147,11 @@ subtest 'basic' => sub {
 
     subtest '_generate_value' => sub {
         subtest 'bit is 0' => sub {
-            isa_ok Orange3::Generator::_generate_value(0), 'Math::BigInt';
+            isa_ok Orange4::Generator::_generate_value(0), 'Math::BigInt';
         };
 
         subtest 'bit is not 0' => sub {
-            isa_ok Orange3::Generator::_generate_value(1), 'Math::BigInt';
+            isa_ok Orange4::Generator::_generate_value(1), 'Math::BigInt';
         };
     };
 

@@ -1,4 +1,4 @@
-name = "Orange3"
+name = "Orange4"
 script_files = ['script/*', 'config/.*']
 [FileGatherer]
  include_dotfiles=true
