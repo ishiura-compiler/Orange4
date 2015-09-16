@@ -204,7 +204,8 @@ sub generate_program {
     my $C_PROGRAM_2 =
     ( $LOCAL_VAR_DECLARATION eq "" ) ? "" : $LOCAL_VAR_DECLARATION . "\n\n";
     $C_PROGRAM_2 .= ( $test eq "" )  ? "" : $test . "\n";
-
+    $C_PROGRAM_2 .= ( $check eq "" )  ? "" : $check . "\n";
+    
 # Program ###############################
 my $C_PROGRAM = <<"__END__";
 $C_PROGRAM_1
@@ -344,9 +345,9 @@ sub generate_assign_statement {
             $specifier = $self->{config}->get('type')->{$type}->{printf_format};
             $COMPARE   = "$test_name == $val";
             $fmt       = "\"@{[$specifier]}\"";
-            $test .= "$tab";
-            $test .= "if ($COMPARE) { OK(); } ";
-            $test .= "else { NG(" . "\"$test_name\", " . "$fmt, t$self->{tval_count}); }\n";
+            $check .= "\t";
+            $check .= "if ($COMPARE) { OK(); } ";
+            $check .= "else { NG(" . "\"$test_name\", " . "$fmt, t$self->{tval_count}); }\n";
         }
         $self->{tval_count}++;
     }
