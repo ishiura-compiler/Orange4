@@ -49,7 +49,8 @@ sub execute {
   $self->_print("\n****** NEXT MINIMIZE: $self->{status}->{file} ******");
   my $guard    = Orange4::Util::Chdir->new( $self->{mini_dir} );
   my $minimize = Orange4::Mini::Minimize->new(
-    $self->{config}, $self->{vars}, $self->{assigns},
+    $self->{config}, $self->{run}->{generator}->{roots},
+    $self->{vars}, $self->{assigns},
     run    => $self->{run},
     status => $self->{status},
   );
@@ -62,25 +63,7 @@ sub execute {
 sub _make_assigns {
   my $self  = shift;
   my $roots = $self->{run}->{generator}->{roots};
-  foreach my $i ( 0 .. $#{$roots} ) {
-
-    # ===> zantei
-    if ( defined $roots->[$i]->{root}
-      && $roots->[$i]->{st_type} eq 'assign'
-      && !defined $roots->[$i]->{name_num} )
-    {
-      $roots->[$i]->{name_num} = $i;
-    }
-    if ( !defined $roots->[$i]->{print_statement} ) {
-      $roots->[$i]->{print_statement} = 1;
-    }
-    if ( !defined $roots->[$i]->{var} ) {
-      $roots->[$i]->{var} = $self->_zantei_var_tansaku($i);
-    }
-
-    # <===
-    $self->_make_assigns_from_st( $roots->[$i] );
-  }
+  $self->_make_assigns_from_st($roots);
 }
 
 sub _zantei_var_tansaku {
@@ -93,11 +76,30 @@ sub _zantei_var_tansaku {
 }
 
 sub _make_assigns_from_st {
-  my ( $self, $st ) = @_;
-  if ( $st->{print_statement} && $st->{st_type} eq 'assign' ) {
-    push @{ $self->{assigns} }, $self->_generate_assign_set($st);
-    $st->{assigns_num} = $#{ $self->{assigns} };
-  }
+    my ($self, $roots) = @_;
+    
+    foreach my $st (@$roots) {
+        if($st->{st_type} eq 'for') {
+           $self->_make_assigns_from_st($st->{statements});
+        }
+        elsif($st->{st_type} eq 'if') {
+           $self->_make_assigns_from_st($st->{st_then});
+           $self->_make_assigns_from_st($st->{st_else});
+        }
+        elsif($st->{st_type} eq 'assign') {
+            if(!defined $st->{print_statement}) {
+                $st->{print_statement} = 1;
+            }
+            if(!defined $st->{var}) {
+                $st->{var} = $self->_zantei_var_tansaku($st->{name_num});
+            }
+            if ($st->{print_statement}) {
+                push @{$self->{assigns}}, $self->_generate_assign_set($st);
+                $st->{assigns_num} = $#{$self->{assigns}};
+            }
+        }
+        else{;}
+    }
 }
 
 sub _generate_assign_set {
@@ -109,6 +111,8 @@ sub _generate_assign_set {
     type            => $st->{type},
     print_statement => $st->{print_statement},
     var             => $st->{var},
+    name_num        => $st->{name_num},
+    path            => $st->{path},
   };
 }
 

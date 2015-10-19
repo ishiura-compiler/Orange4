@@ -2,7 +2,7 @@
   compile => sub {
     my ( $config, $option ) = @_;
     
-    my $command = "gcc $config->{source_file} -o $config->{exec_file} $option";
+    my $command = "gcc $config->{source_file} -o $config->{exec_file} $option -Wno-format";
     my $error   = 0;
     
     while (1) {

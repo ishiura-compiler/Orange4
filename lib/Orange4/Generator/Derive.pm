@@ -7,8 +7,8 @@ use warnings;
 
 use Carp ();
 use Math::BigInt lib => 'GMP';
-#use Math::BigInt;
-use Math::BigFloat;
+use Math::BigInt;
+#use Math::BigFloat;
 #use Math::BigFloat lib => 'GMP';
 #use Orange4::Generator::Arithmetic; # random_range
 use Math::Prime::Util qw/:all/;
@@ -387,7 +387,7 @@ sub decide_multi_ref_var {
     
 #########################  変数を再利用する確率  ###############################
 
-    my $prob = 0.4; # 変数を再利用する確率
+    my $prob = 0; # 変数を再利用する確率
     
 ################################################################################
 

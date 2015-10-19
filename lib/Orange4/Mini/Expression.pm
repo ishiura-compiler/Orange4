@@ -37,12 +37,9 @@ sub binary_texpression_cut_first {
 sub binary_texpression_cut_right {
   my $self = shift;
   $self->{expression}->{left_begin} = $self->{expression}->{right_begin};
-  $self->{expression}->{left_number} =
-    int $self->{expression}->{right_number} / 2;
-  $self->{expression}->{right_begin} =
-    $self->{expression}->{left_begin} + $self->{expression}->{left_number};
-  $self->{expression}->{right_number} =
-    $self->{expression}->{right_number} - $self->{expression}->{left_number};
+  $self->{expression}->{left_number} = int $self->{expression}->{right_number} / 2;
+  $self->{expression}->{right_begin} = $self->{expression}->{left_begin} + $self->{expression}->{left_number};
+  $self->{expression}->{right_number} = $self->{expression}->{right_number} - $self->{expression}->{left_number};
   $self->binary_texpression_cut;
 }
 
@@ -50,23 +47,18 @@ sub binary_texpression_cut_left {
   my $self  = shift;
   my $total = $self->{expression}->{left_number};
   $self->{expression}->{left_begin} = $self->{expression}->{left_begin};
-  $self->{expression}->{left_number} =
-    int $self->{expression}->{left_number} / 2;
-  $self->{expression}->{right_begin} =
-    $self->{expression}->{left_begin} + $self->{expression}->{left_number};
-  $self->{expression}->{right_number} =
-    $total - $self->{expression}->{left_number};
+  $self->{expression}->{left_number} = int $self->{expression}->{left_number} / 2;
+  $self->{expression}->{right_begin} = $self->{expression}->{left_begin} + $self->{expression}->{left_number};
+  $self->{expression}->{right_number} = $total - $self->{expression}->{left_number};
   $self->binary_texpression_cut;
 }
 
 sub binary_texpression_cut_both {
   my $self = shift;
   my $expression;
-  $expression =
-    $self->_clone_expression_number( $self->{expression}, $expression );
+  $expression = $self->_clone_expression_number( $self->{expression}, $expression );
   $self->binary_texpression_cut_left;
-  $self->{expression} =
-    $self->_clone_expression_number( $expression, $self->{expression} );
+  $self->{expression} = $self->_clone_expression_number( $expression, $self->{expression} );
   $self->binary_texpression_cut_right;
 }
 
@@ -82,10 +74,7 @@ sub _clone_expression_number {
 sub binary_texpression_cut {
   my $self = shift;
 
-  if (
-    $self->{expression}->{left_number} + $self->{expression}->{right_number} >
-    1 )
-  {
+  if ( $self->{expression}->{left_number} + $self->{expression}->{right_number} > 1 ) {
     $self->_expression_tree_off_right;
     $self->texpression_cut_mask;
     if ( !$self->_generate_and_test ) {
@@ -109,33 +98,25 @@ sub binary_texpression_cut {
 sub _expression_tree_off_right {
   my $self = shift;
   $self->_expression_tree_off( $self->{expression}->{right_begin},
-    $self->{expression}->{right_begin} +
-      $self->{expression}->{right_number} -
-      1 );
+    $self->{expression}->{right_begin} + $self->{expression}->{right_number} - 1 );
 }
 
 sub _expression_tree_off_left {
   my $self = shift;
   $self->_expression_tree_off( $self->{expression}->{left_begin},
-    $self->{expression}->{left_begin} +
-      $self->{expression}->{left_number} -
-      1 );
+    $self->{expression}->{left_begin} + $self->{expression}->{left_number} - 1 );
 }
 
 sub _expression_tree_on_right {
   my $self = shift;
   $self->_expression_tree_on( $self->{expression}->{right_begin},
-    $self->{expression}->{right_begin} +
-      $self->{expression}->{right_number} -
-      1 );
+    $self->{expression}->{right_begin} + $self->{expression}->{right_number} - 1 );
 }
 
 sub _expression_tree_on_left {
   my $self = shift;
   $self->_expression_tree_on( $self->{expression}->{left_begin},
-    $self->{expression}->{left_begin} +
-      $self->{expression}->{left_number} -
-      1 );
+    $self->{expression}->{left_begin} + $self->{expression}->{left_number} - 1 );
 }
 
 sub lossy_texpression_cut_possible {
@@ -263,7 +244,7 @@ sub texpression_cut_mask {
 
 sub _generate_and_test {
   my $self = shift;
-
+  
   return Orange4::Mini::Compute->new(
     $self->{config}, $self->{vars}, $self->{assigns},
     run    => $self->{run},

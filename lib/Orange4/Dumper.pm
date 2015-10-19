@@ -6,6 +6,8 @@ use warnings;
 use Carp ();
 use Math::BigInt;
 
+use Data::Dumper;
+
 sub new {
   my ( $class, %args ) = @_;
 
@@ -82,79 +84,140 @@ sub _vars {
 
 sub _bigint_dumper {
   my $val = shift;
-
+  
   #    my $sign = $val->sign;
   #    my $value = $val->babs->bstr; # destructive...
-
-#    my $content = "bless({'value'=>[$value], 'sign'=>'$sign'}, 'Math::BigInt')";
+  #    my $content = "bless({'value'=>[$value], 'sign'=>'$sign'}, 'Math::BigInt')";
   my $content = "'$val'";
-
+  
   return $content;
 }
 
 sub _roots {
-  my $self = shift;
+    my $self = shift;
+    
+    my $roots = $self->{roots};
+    my $indent = '';
+    
+    my $s = "roots => [\n";
+    $s .= _roots_dumper($roots, $indent);
+    $s .= "],";
+    
+    return $s;
+}
 
-  my $roots = $self->{roots};
-
-  my $s          = "roots => [\n";
-  my $indent     = ' ';
-  my $new_indent = ' ';
-  my $indent1    = $indent . $new_indent x 2;
-  my $n          = "\n";
-
-  for my $i ( 0 .. $#{$roots} ) {
-    if ( $roots->[$i]->{st_type} eq 'assign' ) {
-      $s .= '{' . $n;
-      $s .= $indent . "'val'=>'$roots->[$i]->{val}'," . $n;
-      $s .= $indent . "'type'=>'$roots->[$i]->{type}'," . $n;
-      $s .= $indent . "'st_type'=>'$roots->[$i]->{st_type}'," . $n;
-      $s .=
-        $indent . "'print_statement'=>'$roots->[$i]->{print_statement}'," . $n;
-      $s .= $indent . "'var'=>{" . $n;
-      $s .= $indent1 . "'type'=>'$roots->[$i]->{var}->{type}'," . $n;
-      if ( ref $roots->[$i]->{var}->{ival} ne 'Math::BigInt' ) {
-        $s .= $indent1 . "'ival'=>'$roots->[$i]->{var}->{ival}'," . $n;
-      }
-      else {
-        $s .=
-            $indent1
-          . "'ival'=>"
-          . _bigint_dumper( $roots->[$i]->{var}->{ival} ) . ","
-          . $n;
-      }
-      if ( ref $roots->[$i]->{var}->{val} ne 'Math::BigInt' ) {
-        $s .= $indent1 . "'val'=>'$roots->[$i]->{var}->{val}'," . $n;
-      }
-      else {
-        $s .=
-            $indent1
-          . "'val'=>"
-          . _bigint_dumper( $roots->[$i]->{var}->{val} ) . ","
-          . $n;
-      }
-      $s .= $indent1 . "'name_type'=>'$roots->[$i]->{var}->{name_type}'," . $n;
-      $s .= $indent1 . "'name_num'=>'$roots->[$i]->{var}->{name_num}'," . $n;
-      $s .= $indent1 . "'class'=>'$roots->[$i]->{var}->{class}'," . $n;
-      $s .= $indent1 . "'modifier'=>'$roots->[$i]->{var}->{modifier}'," . $n;
-      $s .= $indent1 . "'scope'=>'$roots->[$i]->{var}->{scope}'," . $n;
-      $s .= $indent . "}," . $n;
-      $s .= $indent . "'root' => {" . $n;
-
-      if ( $roots->[$i]->{print_statement} ) {
-        $s .= _root_dumper( $roots->[$i]->{root}, $indent );
-      }
-      $s .= $indent . "}," . $n;
-      $s .= '},' . $n;
+sub _roots_dumper {
+    my ($roots, $pre_indent) = @_;
+    
+    my $indent1 = $pre_indent . ' ';
+    my $indent2 = $pre_indent . '  ';
+    my $indent3 = $pre_indent . '   ';
+    my $n = "\n";
+    my $s = '';
+    
+    for my $st (@$roots) {
+        if ($st->{st_type} eq 'for') {
+            $s .= $pre_indent . '{' . $n;
+            $s .= $indent1 . "'st_type'=>'$st->{st_type}'," . $n;
+            $s .= $indent1 . "'print_tree'=>'$st->{print_tree}'," . $n; ###
+            $s .= $indent1 . "'loop_var_name'=>'$st->{loop_var_name}'," . $n;
+            $s .= $indent1 . "'inequality_sign'=>'$st->{inequality_sign}'," . $n;
+            $s .= $indent1 . "'operator'=>'$st->{operator}'," . $n;
+            $s .= $indent1 . "'init_st'=>{" . $n;
+            $s .= $indent2 . "'root'=>{" . $n;
+            $s .= _root_dumper($st->{init_st}->{root}, $indent3);
+            $s .= $indent2 . "}," . $n;
+            $s .= $indent2 . "'type'=>'$st->{init_st}->{type}'," . $n;
+            $s .= $indent2 . "'val'=>'$st->{init_st}->{val}'," . $n;
+            #$s .= $indent2 . "'ival'=>'$st->{init_st}->{ival}'," . $n; ###
+            $s .= $indent1 . "}," . $n;
+            $s .= $indent1 . "'continuation_cond'=>{" . $n;
+            $s .= $indent2 . "'root'=>{" . $n;
+            $s .= _root_dumper($st->{continuation_cond}->{root}, $indent3);
+            $s .= $indent2 . "}," . $n;
+            $s .= $indent2 . "'type'=>'$st->{continuation_cond}->{type}'," . $n;
+            $s .= $indent2 . "'val'=>'$st->{continuation_cond}->{val}'," . $n;
+            #$s .= $indent2 . "'ival'=>'$st->{continuation_cond}->{ival}'," . $n; ###
+            $s .= $indent1 . "}," . $n;
+            $s .= $indent1 . "'re_init_st'=>{" . $n;
+            $s .= $indent2 . "'root'=>{" . $n;
+            $s .= _root_dumper($st->{re_init_st}->{root}, $indent3);
+            $s .= $indent2 . "}," . $n;
+            $s .= $indent2 . "'type'=>'$st->{re_init_st}->{type}'," . $n;
+            $s .= $indent2 . "'val'=>'$st->{re_init_st}->{val}'," . $n;
+            #$s .= $indent2 . "'ival'=>'$st->{re_init_st}->{ival}'," . $n; ###
+            $s .= $indent1 . "}," . $n;
+            $s .= $indent1 . "'statements'=> [\n";
+            $s .= _roots_dumper($st->{statements}, $indent2);
+            $s .= $indent1 . "]," . $n;
+            $s .= $pre_indent . '},' . $n;
+        }
+        elsif ($st->{st_type} eq 'if') {
+            $s .= $pre_indent . '{' . $n;
+            $s .= $indent1 . "'st_type'=>'$st->{st_type}'," . $n;
+            $s .= $indent1 . "'print_tree'=>'$st->{print_tree}'," . $n; ###
+            $s .= $indent1 . "'exp_cond'=>{" . $n;
+            $s .= $indent2 . "'root'=>{" . $n;
+            $s .= _root_dumper($st->{exp_cond}->{root}, $indent3);
+            $s .= $indent2 . "}," . $n;
+            $s .= $indent2 . "'type'=>'$st->{exp_cond}->{type}'," . $n;
+            $s .= $indent2 . "'val'=>'$st->{exp_cond}->{val}'," . $n;
+            #$s .= $indent2 . "'ival'=>'$st->{exp_cond}->{ival}'," . $n; ###
+            $s .= $indent1 . "}," . $n;
+            $s .= $indent1 . "'st_then'=> [\n";
+            $s .= _roots_dumper($st->{st_then}, $indent2);
+            $s .= $indent1 . "]," . $n;
+            $s .= $indent1 . "'st_else'=> [\n";
+            $s .= _roots_dumper($st->{st_else}, $indent2);
+            $s .= $indent1 . "]," . $n;
+            $s .= $pre_indent . '},' . $n;
+        }
+	    elsif ($st->{st_type} eq 'assign') {
+            if (defined $st->{root}) {
+                $s .= $pre_indent . '{' . $n;
+                $s .= $indent1 . "'val'=>'$st->{val}'," . $n;
+                $s .= $indent1 . "'type'=>'$st->{type}'," . $n;
+                $s .= $indent1 . "'st_type'=>'$st->{st_type}'," . $n;
+                $s .= $indent1 . "'path'=>'$st->{path}'," . $n;
+                $s .= $indent1 . "'name_num'=>'$st->{name_num}'," . $n;
+                $s .= $indent1 . "'print_statement'=>'$st->{print_statement}'," . $n;
+                $s .= $indent1 . "'var'=>{" . $n;
+                $s .= $indent2 . "'type'=>'$st->{var}->{type}'," . $n;
+                if (ref $st->{var}->{ival} ne 'Math::BigInt') {
+                    $s .= $indent2 . "'ival'=>'$st->{var}->{ival}'," . $n;
+                }
+                else {
+                    $s .= $indent2 . "'ival'=>" . _bigint_dumper($st->{var}->{ival}) . "," . $n;
+                }
+                if (ref $st->{var}->{val} ne 'Math::BigInt') {
+                    $s .= $indent2 . "'val'=>'$st->{var}->{val}'," . $n;
+                }
+                else {
+                    $s .= $indent2 . "'val'=>" . _bigint_dumper($st->{var}->{val}) . "," . $n;
+                }
+                $s .= $indent2 . "'name_type'=>'$st->{var}->{name_type}'," . $n;
+                $s .= $indent2 . "'name_num'=>'$st->{var}->{name_num}'," . $n;
+                $s .= $indent2 . "'class'=>'$st->{var}->{class}'," . $n;
+                $s .= $indent2 . "'modifier'=>'$st->{var}->{modifier}'," . $n;
+                $s .= $indent2 . "'scope'=>'$st->{var}->{scope}'," . $n;
+                $s .= $indent2 . "'used'=>'$st->{var}->{used}'," . $n;
+                $s .= $indent1 . "}," . $n;
+                
+                $s .= $indent1 . "'root' => {" . $n;
+                if($st->{print_statement}) {
+                	$s .= _root_dumper($st->{root}, $indent2);
+                }
+                $s .= $indent1 . "}," . $n;
+                $s .= $pre_indent . "}," . $n;
+             }
+            else {
+                $s .= 'undef;' . $n;
+            }
+        }
+        else { Carp::croak( "Invalid st_type $st->{st_type}" ); }
     }
-    else {
-      $s .= 'undef;' . $n;
-    }
-  }
-
-  $s .= "],";
-
-  return $s;
+    
+    return $s;
 }
 
 sub _root_dumper {
@@ -210,10 +273,7 @@ sub _root_dumper {
     }
     else {
       $s .=
-          $indent1
-        . "'ival'=>"
-        . _bigint_dumper( $ref->{var}->{ival} ) . ","
-        . $n;
+          $indent1 . "'ival'=>" . _bigint_dumper( $ref->{var}->{ival} ) . "," . $n;
     }
     if ( ref $ref->{var}->{val} ne 'Math::BigInt' ) {
       $s .= $indent1 . "'val'=>'$ref->{var}->{val}'," . $n;

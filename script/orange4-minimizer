@@ -10,4 +10,3 @@ use Orange4::Mini;
 my $runner = Orange4::Mini->new();
 $runner->parse_options(@ARGV);
 $runner->run;
-

@@ -19,8 +19,7 @@ sub _count_defined_assign {
   my ($assigns) = @_;
   my $assign_define = 0;
   for my $i ( 0 .. $#{$assigns} ) {
-    $assign_define =
-      _check_assign( $assigns->[$i] ) ? ++$assign_define : $assign_define;
+    $assign_define = _check_assign( $assigns->[$i] ) ? ++$assign_define : $assign_define;
   }
   return $assign_define;
 }
@@ -43,8 +42,7 @@ sub _count_assign_exp {
   my ($assigns) = @_;
   my $assign_define = 0;
   for my $i ( 0 .. $#{$assigns} ) {
-    $assign_define =
-      _check_assign_exp( $assigns->[$i] ) ? ++$assign_define : $assign_define;
+    $assign_define = _check_assign_exp( $assigns->[$i] ) ? ++$assign_define : $assign_define;
   }
   return $assign_define;
 }
@@ -53,10 +51,7 @@ sub _count_assign_exp_only {
   my ($assigns) = @_;
   my $assign_define = 0;
   for my $i ( 0 .. $#{$assigns} ) {
-    $assign_define =
-      _check_assign_exp_only( $assigns->[$i] )
-      ? ++$assign_define
-      : $assign_define;
+    $assign_define = _check_assign_exp_only( $assigns->[$i] ) ? ++$assign_define : $assign_define;
   }
   return $assign_define;
 }

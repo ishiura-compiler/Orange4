@@ -5,8 +5,8 @@ use warnings;
 use Carp ();
 
 use Orange4::Mini::Util;
+use Orange4::Mini::Expect;
 use Orange4::Generator;
-use Orange4::Generator::Expect;
 use Orange4::Generator::Program;
 use Orange4::Runner::Compiler;
 use Orange4::Runner::Executor;
@@ -56,7 +56,7 @@ sub dump_test {
 sub _type_value_compute {
   my ( $self, $assign_i_root ) = @_;
   $self->{generator}->type_compute($assign_i_root);
-  Orange4::Generator::Expect::value_compute( $assign_i_root, $self->{vars},
+  Orange4::Mini::Expect::value_compute( $assign_i_root, $self->{vars},
     $self->{config}, $self->{status}->{avoide_undef} );
   return ( $assign_i_root->{out}->{val} eq "UNDEF" ) ? 2 : 0;
 }
@@ -65,7 +65,7 @@ sub _type_insadd_value_compute {
   my ( $self, $assign_i_root ) = @_;
   $self->{generator}->type_compute($assign_i_root);
   $self->insadd_value($assign_i_root);
-  Orange4::Generator::Expect::value_compute( $assign_i_root, $self->{vars},
+  Orange4::Mini::Expect::value_compute( $assign_i_root, $self->{vars},
     $self->{config}, $self->{status}->{avoide_undef} );
   return ( $assign_i_root->{out}->{val} eq "UNDEF" ) ? 2 : 0;
 }
@@ -86,7 +86,7 @@ sub _insadd_value_preparation_compute {
   if ( $ref_in0->{ref}->{ntype} eq 'op' ) {
     if ( $ref_in0->{print_value} == 0 ) {
       $self->{generator}->type_compute( $ref_in0->{ref} );
-      Orange4::Generator::Expect::value_compute( $ref_in0->{ref},
+      Orange4::Mini::Expect::value_compute( $ref_in0->{ref},
         $self->{vars}, $self->{config}, $self->{status}->{avoide_undef} );
     }
   }
@@ -294,33 +294,34 @@ sub _assign_put {
 }
 
 sub _put_roots_from_assign {
-  my $self  = shift;
-  my $roots = $self->{generator}->{roots};
-
-  foreach my $i ( 0 .. $#{$roots} ) {
-    if ( $roots->[$i]->{st_type} eq 'assign' ) {
-      my $assigns_num = $roots->[$i]->{assigns_num};
-
-      #        if ($self->{assigns}->[$assigns_num]->{print_statement}) {
-      $roots->[$i]->{root} = $self->{assigns}->[$assigns_num]->{root};
-      $roots->[$i]->{val}  = $self->{assigns}->[$assigns_num]->{val};
-      $roots->[$i]->{type} = $self->{assigns}->[$assigns_num]->{type};
-      $roots->[$i]->{var}  = $self->{assigns}->[$assigns_num]->{var};
-      $roots->[$i]->{print_statement} =
-        $self->{assigns}->[$assigns_num]->{print_statement};
-
-      #        }
-      #        else {
-      #            undef $roots->[$i]->{root};
-      #        }
+  my ($self, $roots) = @_;
+  
+  foreach my $st (@$roots ) {
+    if ( $st->{st_type} eq 'for' ) {
+            $self->_put_roots_from_assign($st->{statements});
     }
+    elsif ( $st->{st_type} eq 'if' ) {
+            $self->_put_roots_from_assign($st->{st_then});
+            $self->_put_roots_from_assign($st->{st_else});
+    }
+    elsif ( $st->{st_type} eq 'assign' ) {
+      my $assigns_num = $st->{assigns_num};
+      $st->{root}            = $self->{assigns}->[$assigns_num]->{root};
+      $st->{val}             = $self->{assigns}->[$assigns_num]->{val};
+      $st->{type}            = $self->{assigns}->[$assigns_num]->{type};
+      $st->{var}             = $self->{assigns}->[$assigns_num]->{var};
+      $st->{print_statement} = $self->{assigns}->[$assigns_num]->{print_statement};
+    }
+    else {;}
   }
 }
 
 sub _generate_test_program {
   my $self = shift;
+  
   $self->_assign_put;
-  $self->_put_roots_from_assign;
+  $self->_put_roots_from_assign($self->{generator}->{roots});
+  
   my $generator = Orange4::Generator::Program->new( $self->{config} );
   $generator->generate_program( $self->{vars}, $self->{generator}->{roots} );
   $self->{generate_test}->{program} = $generator->program;

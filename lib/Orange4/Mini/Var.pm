@@ -471,11 +471,11 @@ sub _minimize_var {
       $self->{minimize_var}->{assign_var_locate} = [];
       $self->_search_assigns_var( $name,
         $self->{minimize_var}->{assign_var_locate} );
-      $update = $self->_minimize_var_value    ? 1 : $update;
-      $update = $self->_minimize_var_type     ? 1 : $update;
-      $update = $self->_minimize_var_class    ? 1 : $update;
-      $update = $self->_minimize_var_modifier ? 1 : $update;
-      $update = $self->_minimize_var_scope    ? 1 : $update;
+      #$update = $self->_minimize_var_value    ? 1 : $update;
+      #$update = $self->_minimize_var_type     ? 1 : $update;
+      #$update = $self->_minimize_var_class    ? 1 : $update;
+      #$update = $self->_minimize_var_modifier ? 1 : $update;
+      #$update = $self->_minimize_var_scope    ? 1 : $update;
     }
   }
   return $update;
@@ -495,8 +495,8 @@ sub _minimize_var_final {
       $self->{minimize_var}->{assign_var_locate} = [];
       $self->_search_assigns_var( $name,
         $self->{minimize_var}->{assign_var_locate} );
-      $update = $self->_minimize_var_value ? 1 : $update;
-      $update = $self->_minimize_var_type  ? 1 : $update;
+      #$update = $self->_minimize_var_value ? 1 : $update;
+      #$update = $self->_minimize_var_type  ? 1 : $update;
     }
   }
   return $update;
@@ -510,7 +510,7 @@ sub int_ification {
 
 sub _dump_test {
   my ( $self, $assigns_i, $recompute ) = @_;
-
+  
   return Orange4::Mini::Compute->new(
     $self->{config}, $self->{vars}, $self->{assigns},
     run    => $self->{run},

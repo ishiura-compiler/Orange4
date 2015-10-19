@@ -93,6 +93,7 @@ sub copy_assign_number {
     $clone_assigns->[$i]->{print_statement} = $assign_i->{print_statement};
     $clone_assigns->[$i]->{root}            = {}
       unless ( defined( $clone_assigns->[$i]->{root} ) );
+    $clone_assigns->[$i]->{var} = $assign_i->{var};
     $self->copy_assign( $assigns->[$i]->{root}, $clone_assigns->[$i]->{root} );
   }
   elsif ( !$assign_i->{print_value} ) {
@@ -100,6 +101,7 @@ sub copy_assign_number {
     $clone_assigns->[$i]->{print_statement} = $assign_i->{print_statement};
     $clone_assigns->[$i]->{val}             = $assign_i->{val};
     $clone_assigns->[$i]->{type}            = $assign_i->{type};
+    $clone_assigns->[$i]->{var} = $assign_i->{var};
   }
   else {
     Carp::croak("\$assigns->[$i]->{print_value} : $assign_i->{print_value}");

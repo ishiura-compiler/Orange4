@@ -3,7 +3,7 @@
     my ( $config, $option ) = @_;
     
     my $command =
-      "$config->{compiler} $config->{source_file} -o $config->{exec_file} $option -Wno-constant-logical-operand -Wno-tautological-compare -Wno-parentheses-equality";
+      "$config->{compiler} $config->{source_file} -o $config->{exec_file} $option -w";
     my $error = 0;
     
     while (1) {

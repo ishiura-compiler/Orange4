@@ -66,8 +66,8 @@ sub _minimize_constant_assign_recursively {
       }
       else {
         $self->_set_minimize_constant_from_current_r($r);
-        $update = $self->_minimize_constant_value ? 1 : $update;
-        $update = $self->_minimize_constant_type  ? 1 : $update;
+        #$update = $self->_minimize_constant_value ? 1 : $update;
+        #$update = $self->_minimize_constant_type  ? 1 : $update;
       }
     }
   }

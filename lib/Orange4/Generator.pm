@@ -9,6 +9,7 @@ use Math::BigInt;
 use Orange4::Dumper;
 use Orange4::Log;
 use Orange4::Generator::Derive;
+use Orange4::Mini::Arithmetic;
 
 sub new {
     my ( $class, %args ) = @_;
@@ -46,8 +47,10 @@ sub run {
 sub _init {
     my $self = shift;
     
-    $self->{expression_size} = _get_expression_size( $self->{config} );
-    $self->_get_root_size();
+    #do {
+        $self->{expression_size} = _get_expression_size( $self->{config} );
+        $self->_get_root_size();
+    #} while ( $self->{root_max} > 200 );
     $self->_get_var_size();
     $self->{tval_count} = 0;
 }
@@ -241,7 +244,7 @@ sub generate_statement {
     my $root_use_num;
     
     do {
-        my $nest_path = 1;
+        my $nest_path = 1; # 再帰呼び出し時に渡す$path
         if ( $depth == 1 ) {
             if ( !($self->{config}->get('debug_mode')) ) {
                 local $| = 1;
@@ -251,6 +254,7 @@ sub generate_statement {
                 local $| = 0;
             }
         }
+        
         # ブロック内の文数がかたよらないように調整
         if ( $rest_of_roots < 20 ) {
             $root_use_num = int(rand($rest_of_roots-1)) + 1;
@@ -351,14 +355,15 @@ sub generate_statement {
             my $body = $self->generate_statement($depth+1, $root_use_num - 3, $nest_path);
             
             my $st = +{
-                st_type             => $st_type,
-                loop_var_name         => $name_type,
-                init_st                => $init_st,
-                continuation_cond    => $continuation_cond,
-                re_init_st            => $re_init_st,
-                inequality_sign        => $inequality_sign,
-                operator            => $operator,
-                statements            => $body,
+                st_type           => $st_type,
+                loop_var_name     => $name_type,
+                init_st           => $init_st,
+                continuation_cond => $continuation_cond,
+                re_init_st        => $re_init_st,
+                inequality_sign   => $inequality_sign,
+                operator          => $operator,
+                statements        => $body,
+                print_tree        => 1,
             };
             
             push @$statements, $st;
@@ -417,10 +422,11 @@ sub generate_statement {
             }
             
             my $st = +{
-                st_type  => $st_type,
-                exp_cond => $exp_cond,
-                st_then  => $st_then,
-                st_else  => $st_else,
+                st_type    => $st_type,
+                exp_cond   => $exp_cond,
+                st_then    => $st_then,
+                st_else    => $st_else,
+                print_tree => 1,
             };
             
             push @$statements, $st;
@@ -430,12 +436,13 @@ sub generate_statement {
                 my $st_type = 'assign';
                 my $expression = $self->generate_expressions(1, $path, undef);
                 my $assign = +{
-                    st_type    => $st_type,
-                    path    => $path,
-                    type    => $expression->{type},
-                    val        => $expression->{val},
-                    root    => $expression->{root},
-                    var        => $expression->{var},
+                    st_type         => $st_type,
+                    path            => $path,
+                    type            => $expression->{type},
+                    val             => $expression->{val},
+                    root            => $expression->{root},
+                    var             => $expression->{var},
+                    name_num        => $expression->{var}->{name_num},
                     print_statement => 1,
                 };
                 push @$statements, $assign;
@@ -470,9 +477,9 @@ sub generate_expressions {
             $self->{root}->{out}->{val},
             $self->{tval_count}
         );
-        if( $path == 0 ) { $t_var->{ival} = $self->{root}->{out}->{val}; }
-        push @{$self->{vars}}, $t_var;
+        if ( $path == 0 ) { $t_var->{ival} = $self->{root}->{out}->{val}; }
         if ( $path == 1 ) { push @{$self->{vars_on_path}}, $t_var }
+        push @{$self->{vars}}, $t_var;
         $self->{tval_count}++;
         
         return +{
@@ -546,9 +553,9 @@ sub generate_expression_by_derivation {
     if($self->{config}->get('debug_mode'));
     
     while(0 <= $#$leaf_nodes) {
-            $derive->update_sorted_vars(
-                $vars_sorted_by_value, $#$vars - $current_vars_size
-            );
+        #$derive->update_sorted_vars(
+        #    $vars_sorted_by_value, $#$vars - $current_vars_size
+        #);
         $current_vars_size = $#$vars;
         
         if ( !$gen_tvar ) {
@@ -562,6 +569,200 @@ sub generate_expression_by_derivation {
         
         shift @$leaf_nodes;
     }
+}
+
+#treeの計算 => ??
+sub type_compute {
+    my ($self, $n) = @_;
+
+    my $arithmetic = Orange4::Mini::Arithmetic->new(
+        config => $self->{config},
+    );
+
+    if ($n->{ntype} eq 'var') {
+        $n->{out}->{type} = $n->{var}->{type};
+    }
+    elsif ($n->{ntype} eq 'op') {
+        for my $i (@{$n->{in}}) {
+            if ($i->{print_value} == 0) {
+                $self->type_compute($i->{ref});
+            }
+        }
+
+        #以下の演算子の場合、浮動小数を整数にキャスト
+        if ($n->{otype} eq "%" || $n->{otype} eq "<<" || $n->{otype} eq ">>" || $n->{otype} eq "|" || $n->{otype} eq "^" || $n->{otype} eq "&" )
+        {
+            for my $k (@{$n->{in}})
+            {
+            	my $type = $k->{ref}->{out}->{type};
+            	if ( $type eq "double" || $type eq "long double" || $type eq "float")
+            	{
+           		 	#浮動小数を整数型にキャスト
+           		 	$k->{ref} = insert_cast($k->{ref});
+            	}
+            }
+        }
+
+        #シフト演算の場合、算術型変換は適用されない。（結果の型は左オペランドの型になる）
+        if ($n->{otype} eq "<<" || $n->{otype} eq ">>")
+        {
+            #汎整数拡張
+            for my $k (@{$n->{in}})
+            {
+                if ($k->{print_value} == 2) {                
+                    $k->{type} = $self->integral_promotion($k->{type});
+                }
+                else {               
+                    $k->{ref}->{out}->{type} = $self->integral_promotion($k->{ref}->{out}->{type});
+                }
+            }
+
+
+            #左のオペランドの型になる
+            if($n->{in}->[0]->{print_value} == 2) {
+ 	           $n->{type} = $n->{in}->[0]->{type};
+ 	        }
+ 	        else {
+ 	           $n->{out}->{type} = $n->{in}->[0]->{ref}->{out}->{type};
+			}
+			
+            for my $k (@{$n->{in}})
+            {
+                if ($k->{print_value} == 2) {
+                	;
+                }
+                else {
+					$k->{type} = $k->{ref}->{out}->{type};
+				}
+            }
+
+        }
+        # 関係演算子の場合（結果の型はint型になる）
+        elsif ($n->{otype} eq "<" || $n->{otype} eq ">" || $n->{otype} eq "<=" || $n->{otype} eq ">=" || $n->{otype} eq "!=" || $n->{otype} eq "==" || $n->{otype} eq "&&" || $n->{otype} eq "||")
+        {
+            # 汎整数拡張
+            for my $k (@{$n->{in}})
+            {
+                if ($k->{print_value} == 2) {
+                	$k->{type} = $self->integral_promotion($k->{type});
+                }
+                else {
+                	$k->{ref}->{out}->{type} = $self->integral_promotion($k->{ref}->{out}->{type});
+                }
+            }
+            
+            my $left_type;
+            my $right_type;
+            if($n->{in}->[0]->{print_value} == 2) { $left_type = $n->{in}->[0]->{type}; }
+            else { $left_type = $n->{in}->[0]->{ref}->{out}->{type}; }
+            if($n->{in}->[1]->{print_value} == 2) { $right_type = $n->{in}->[1]->{type}; }
+            else { $right_type = $n->{in}->[1]->{ref}->{out}->{type}; }
+            
+            $n->{out}->{type} = $arithmetic->arithmetic_conversion($left_type, $right_type);
+            
+            for my $k (@{$n->{in}})
+            {
+				if ($k->{print_value} == 2) {
+					;
+				}
+				else
+				{
+					$k->{type} = $k->{ref}->{out}->{type};
+	                #結果のかたを見て、もとの型も変更
+	                $k->{type} = $n->{out}->{type};
+				}
+            }
+            $n->{out}->{type} = "signed int";
+        }
+        elsif ($n->{otype} eq "(signed int)")
+        {
+            ;
+        }
+        else
+        {
+            # 汎整数拡張
+            for my $k (@{$n->{in}})
+            {
+                if ($k->{print_value} == 2) {
+                	$k->{type} = $self->integral_promotion($k->{type});
+                }
+                else {
+                	$k->{ref}->{out}->{type} = $self->integral_promotion($k->{ref}->{out}->{type});
+                }
+            }
+            
+            # それ以外は算術型変換
+            my $left_type;
+            my $right_type;
+            if($n->{in}->[0]->{print_value} == 2) { $left_type = $n->{in}->[0]->{type}; }
+            else { $left_type = $n->{in}->[0]->{ref}->{out}->{type}; }
+            if($n->{in}->[1]->{print_value} == 2) { $right_type = $n->{in}->[1]->{type}; }
+            else { $right_type = $n->{in}->[1]->{ref}->{out}->{type}; }
+            
+            $n->{out}->{type} = $arithmetic->arithmetic_conversion($left_type, $right_type);
+
+            for my $k (@{$n->{in}})
+            {
+				if ($k->{print_value} == 2) {
+					;
+				}
+				else
+				{
+					$k->{type} = $k->{ref}->{out}->{type};
+	                #結果のかたを見て、もとの型も変更
+	                $k->{type} = $n->{out}->{type};
+				}
+            }
+        }
+    }
+}
+
+#汎整数拡張
+sub integral_promotion {
+    my ($self, $type) = @_;
+
+    my $bits = $self->{config}->get('type')->{$type}->{bits};
+    my $signed_int_bits = $self->{config}->get('type')->{'signed int'}->{bits};
+
+    if ($bits < $signed_int_bits) {
+        $type =~ s/^(unsigned|signed) (char|short)$/signed int/;
+    }
+    elsif ($bits == $signed_int_bits) {
+        $type =~ s/(char|short)$/int/;
+    }
+    elsif ($bits > $signed_int_bits) {
+        ;
+    }
+    else { 
+        Carp::croak("Invalid value: ($bits, $signed_int_bits)")
+    }
+
+    return $type;
+}
+
+sub insert_cast {
+    my ($ref) = @_;
+
+    my $i = {
+        type        => $ref->{out}->{type},
+        val         => undef,
+        ref         => $ref,
+        print_value => 0,
+    };
+
+    my $o = {
+        type => 'signed int',
+        val  => undef,
+    };
+
+    my $n = {
+        ntype => 'op',
+        otype => '(signed int)',
+        in    => [$i],
+        out   => $o
+    };
+
+    return $n;
 }
 
 # Accessor
