@@ -46,8 +46,8 @@
     "unsigned long",
     "signed long long",
     "unsigned long long",
-    "float",
-    "double",
+    #"float",
+    #"double",
     #"long double",
   ],
   

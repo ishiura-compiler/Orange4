@@ -123,6 +123,7 @@ sub _roots_dumper {
             $s .= $indent1 . "'loop_var_name'=>'$st->{loop_var_name}'," . $n;
             $s .= $indent1 . "'inequality_sign'=>'$st->{inequality_sign}'," . $n;
             $s .= $indent1 . "'operator'=>'$st->{operator}'," . $n;
+            $s .= $indent1 . "'loop_path'=>'$st->{loop_path}'," . $n;
             $s .= $indent1 . "'init_st'=>{" . $n;
             $s .= $indent2 . "'root'=>{" . $n;
             $s .= _root_dumper($st->{init_st}->{root}, $indent3);

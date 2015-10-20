@@ -200,6 +200,29 @@ sub try_reduce {
     return $update;
 }
 
+sub minimize_for_and_if_arguments {
+    my ( $self, $roots ) = @_;
+    
+    my $update = 0;
+    
+    foreach my $st ( @$roots ) {
+        if ( $st->{st_type} eq "for" ) {
+            $update = $self->minimize_inorder_head( $st->{init_st}->{root}, 0 );
+            $update = $self->minimize_inorder_head( $st->{continuation_cond}->{root}, 0 );
+            $update = $self->minimize_inorder_head( $st->{re_init_st}->{root}, 0 );
+            $update = $self->minimize_for_and_if_arguments( $st->{statements} );
+        }
+        elsif ( $st->{st_type} eq "if" ) {
+            $update = $self->minimize_inorder_head( $st->{exp_cond}->{root}, 0 );
+            $update = $self->minimize_for_and_if_arguments( $st->{st_then} );
+            $update = $self->minimize_for_and_if_arguments( $st->{st_else} );
+        }
+        else { ; }
+    }
+    
+    return $update;
+}
+
 sub _generate_and_test {
     my $self = shift;
     

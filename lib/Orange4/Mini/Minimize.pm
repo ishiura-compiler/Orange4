@@ -95,7 +95,8 @@ sub _new_minimize_first_assign_minimize {
     # if ( $self->_new_minimize_top_down ) { $self->_new_minimize_first_inorder; }
     # else                                 { $self->_new_minimize_first_preorder; }
     
-    $self->_new_minimize_first_inorder; 
+    $self->_new_minimize_first_inorder;
+    $self->_new_minimize_for_and_if_arguments;
 }
 
 sub _new_minimize_top_down {
@@ -154,6 +155,22 @@ sub _new_minimize_first_inorder {
             $bottomup->minimize_inorder_head( $self->{assigns}->[$i]->{root}, $i );
         }
     }
+}
+
+sub _new_minimize_for_and_if_arguments {
+    my $self = shift;
+    
+    my $update = 0;
+    
+    $self->_must_print("------ FOR AND IF ARGUMENTS REDUCE ------\n");
+    my $bottomup = Orange4::Mini::Bottomup->new(
+        $self->{config}, $self->{vars}, $self->{assigns},
+        run    => $self->{run},
+        status => $self->{status},
+    );
+    do {
+        $update = $bottomup->minimize_for_and_if_arguments( $self->{roots} );
+    } while ( $update == 1 );
 }
 
 sub _new_minimize_first_preorder {
