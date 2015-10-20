@@ -7,8 +7,6 @@ use Carp ();
 use Orange4::Mini::Backup;
 use Orange4::Mini::Util;
 
-use Data::Dumper;
-
 sub new {
     my ( $class, $config, $vars, $assigns, %args ) = @_;
     
@@ -24,7 +22,7 @@ sub new {
     }, $class;
 }
 
-sub if_tree_minimize { 
+sub tree_minimize { 
     my ($self, $roots) = @_;
     
     my $update = 0;
@@ -32,13 +30,14 @@ sub if_tree_minimize {
 ########
 # print_tree の値
 # 0 ... if 文を消して, then と else のパスが通っている方を一段上に出力する
-# 1 ... すべて出力
+# 1 ... 全て出力
 # 2 ... if 文は出力し, パスが通っていない方を空にする
+# 3 ... 条件文が残っていた場合に, 代入文にする
+# 4 ... 全て出力
 ########
-
-    foreach my $st (@$roots) {
-        
-        if ( $update != 1 && $st->{st_type} eq "if" ) {
+    
+    foreach my $st ( @$roots ) {
+        if ( $st->{st_type} eq "if" ) {
             if ( $st->{print_tree} == 1 ) {
                 $st->{print_tree} = 0;
                 if ( $self->_generate_and_test ) {
@@ -62,15 +61,15 @@ sub if_tree_minimize {
             }
             elsif ( $st->{print_tree} == 0 || $st->{print_tree} == 2 || $st->{print_tree} == 3 ) {
                 if ( $st->{exp_cond}->{val} != 0 ) {
-                    $self->if_tree_minimize($st->{st_then});
+                    $self->tree_minimize($st->{st_then});
                 }
                 else {
-                    $self->if_tree_minimize($st->{st_else});
+                    $self->tree_minimize($st->{st_else});
                 }
             }
             elsif ( $st->{print_tree} == 4 ) {
-                $self->if_tree_minimize($st->{st_then});
-                $self->if_tree_minimize($st->{st_else});
+                $self->tree_minimize($st->{st_then});
+                $self->tree_minimize($st->{st_else});
             }
             else {;}
         }

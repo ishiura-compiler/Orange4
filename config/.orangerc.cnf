@@ -54,8 +54,8 @@
   # Scopes, separated by commas
   scopes => [ "LOCAL", "GLOBAL" ],
   
-  # Loop value names
-  # can't use "k", "t", and "x"
+  # Loop variable names
+  # can't use "c", "k", "t", and "x"
   loop_var_name => [ "i", "j", "l", "m", "n", "o" ],
   
   # Details of types

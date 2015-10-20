@@ -4,21 +4,21 @@ use strict;
 use warnings;
 
 sub new {
-  my ( $class, %args ) = @_;
-
-  bless {
-    error     => [],
-    error_msg => "",
-    command   => "",
-    %args,
-  }, $class;
+    my ( $class, %args ) = @_;
+    
+    bless {
+        error     => [],
+        error_msg => "",
+        command   => "",
+        %args,
+    }, $class;
 }
 
 sub run {
-  my $self = shift;
-
-  ( $self->{error_msg}, $self->{error}, $self->{command} ) =
-    $self->{execute}->( $self->{config} );
+    my $self = shift;
+    
+    ( $self->{error_msg}, $self->{error}, $self->{command} ) =
+        $self->{execute}->( $self->{config} );
 }
 
 sub error     { @{ shift->{error} }; }

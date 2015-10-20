@@ -6,11 +6,10 @@ use strict;
 use warnings;
 
 use Carp ();
-use Math::BigInt lib => 'GMP';
-use Math::BigInt;
-#use Math::BigFloat;
-#use Math::BigFloat lib => 'GMP';
-#use Orange4::Generator::Arithmetic; # random_range
+#use Math::BigInt lib => 'GMP';
+#use Math::BigInt;
+use Math::BigFloat;
+use Math::BigFloat lib => 'GMP';
 use Math::Prime::Util qw/:all/;
 use List::Util;
 
@@ -33,29 +32,29 @@ use constant PRIME_TABLE => [2, 3, 5, 7, 11, 13, 17, 19, 23, 29, 31, 37, 41, 43,
 sub generate_random_float {
     my ($self, $float_type, $zero_flg) = @_;
     my $res = '';
-
+    
     if($float_type =~ m/(float|double)$/) {
         my $type = $self->{config}->get('type');
-
+        
         # generate exponent
         my $e_min = $type->{$float_type}->{e_min};
         my $e_max = $type->{$float_type}->{e_max};
         my $e = int(rand($e_max - $e_min + 1)) + $e_min;
-
+        
         # generate mantissa
         $res = _generate_random_binary($type->{$float_type}->{bits}-1);
         $res = bin2dec($float_type, $res);
         $res += 1;
-
+        
         $res *= accurate_pow_of_two($float_type, $e);
         $res = 0 if($res == 1 && $zero_flg && int rand 2);
-
+        
         $res = -$res if(int rand 2);
     }
     else {
         Carp::croak "_generate_random_float can rdeceive only float types: $float_type";
     }
-
+    
     return $res;
 }
 
@@ -63,11 +62,11 @@ sub generate_random_float {
 sub _generate_random_binary {
     my $bits = shift;
     my $res = '';
-
+    
     for(1 .. $bits) {
         $res .= (int rand 2) ? '0' : '1';
     }
-
+    
     return $res;
 }
 
@@ -80,7 +79,7 @@ sub accurate_pow_of_two {
 =pod
     if($exp < 0) {
         $res = Math::BigFloat->new('1');
-
+        
         for(1 .. (abs $exp)) {
             $res *= 0.5;
         }
@@ -108,7 +107,7 @@ sub make_leaf_nodes_info {
     my $l_expsize = 0;
     my $r_expsize = 0;
     $expsize--;
-
+    
     if($expsize <= 0 || $depth <= 0) {
         # 導出を終了. 変数ノードを整形
         for my $in (@{$n->{in}}) {
@@ -128,7 +127,7 @@ sub make_leaf_nodes_info {
         $l_expsize_min = $expsize - $l_expsize_max;
         $l_expsize_min = 0 if($l_expsize_min < 0);
         $l_expsize = int(($l_expsize_max - $l_expsize_min+1) * rand() + $l_expsize_min);
-
+        
         if($l_expsize > $expsize) {
             $slope_degree = int(rand 5) * 25;
             $l_expsize =int($expsize * ($slope_degree/100));
@@ -136,9 +135,9 @@ sub make_leaf_nodes_info {
         else {
             ;
         }
-
+        
         $r_expsize = $expsize - $l_expsize;
-
+        
         # 導出に使用する変数ノードをリストに追加
         for my $i (0 .. $#{$n->{in}}) {
             $node_info = {
@@ -157,7 +156,7 @@ sub make_leaf_nodes_info {
 # リーフ(変数)ノードの整形
 sub adjust_varnode {
     my $vn = shift;
-
+    
     $vn->{out}->{type} = $vn->{var}->{type};
     $vn->{out}->{val}  = $vn->{var}->{val};
     $vn->{var}->{used} = 1;
@@ -168,13 +167,13 @@ sub adjust_varnode {
 # 受け取った変数ノードの値を解とする式を生成.
 sub derive_expression {
     my ($self, $n, $vars_sorted_by_value) = @_;
-
+    
     # 導出に使う演算子ノードに変換. in を作成
     $n = $self->varnode2opnode($n, $vars_sorted_by_value);
-
+    
     # オペランドを結合
     $self->set_operand($n);
-
+    
     return $n;
 }
 
@@ -183,41 +182,41 @@ sub varnode2opnode {
     my ($self, $n, $vars_sorted_by_value) = @_;
     my $orig_type = $n->{var}->{type};
     my $orig_val  = $n->{var}->{val};
-
+    
     # 導出した算術式が返す型を決定(キャストを挿入)
     $n = $self->define_derivation_var_type($n);
-
+    
     # 演算子ノードの情報(ntype, otype, $n->{out}) をセット
     # $n->{var} を削除
     set_opnode_info($n, $n->{nxt_op});
-
+    
     print "$orig_val, [$n->{otype}, ($orig_type)$n->{out}->{type}] = "
         if($self->{config}->get('debug_mode'));
-
+    
     # $n->{in} の val, type, print_value をセット. (type は導出元と同じ)
     $self->set_opnodein($n, $vars_sorted_by_value);
-
+    
     print "$n->{in}->[0]->{val} $n->{otype} $n->{in}->[1]->{val};\n"
         if($self->{config}->get('debug_mode'));
     print "$n->{in}->[0]->{nxt_op} :: $n->{in}->[1]->{nxt_op};\n"
         if($self->{config}->get('debug_mode'));
-
+    
     return $n;
 }
 
 # for cast float value with integer type
 sub round_val {
     my $val = shift;
-
+    
     $val = $val->copy();
-
+    
     if($val < 0) {
         $val->bceil();
     }
     else {
         $val->bfloor();
     }
-
+    
     return $val;
 }
 
@@ -231,17 +230,17 @@ sub select_opcode_with_range {
     my ($orig_type_min, $orig_type_max) = $self->get_type_min_max($orig_type); # for mod op
     my $min_mid = $orig_type_min / 2 + 1;
     my $max_mid = int($orig_type_max / 2);
-
+    
     push(@oplist, qw(< <= == != >= > && ||))
         if(($rand_min <= 0 && 0 <= $rand_max) ||
            ($rand_min <= 1 && 1 <= $rand_max));
-
+    
     # rand_min などに含まれていれば
     push @oplist, qw(% % % % %)
         if($orig_type =~ m/signed/ &&
            (($rand_min < 0 && $min_mid <= $rand_min) ||
             (0 <= $rand_max && $rand_max <= $max_mid)));
-
+    
     # 浮動小数点数型の場合, 整数を含むかどうかチェック
     my $rand_min_int = 0;
     my $rand_max_int = 0;
@@ -253,11 +252,11 @@ sub select_opcode_with_range {
     else {
         ;
     }
-
+    
     push(@oplist, qw(<< << << << << >> >> >> >> >> & & & & & | | | | | ^ ^ ^ ^ ^))
         if(0 <= $rand_max && 0 <= $rand_max_int - $rand_min_int &&
            ($rand_min_int <= $max_type_min && $max_type_max <= $rand_max_int));
-
+    
     return $oplist[rand @oplist];
 }
 
@@ -272,22 +271,22 @@ sub select_opcode_with_value {
     
     # config の演算子リストを使用していない
     my @oplist = qw(+ + - - * * * * / / / /);
-
+    
     # 浮動小数点数の場合, 整数型で表現できるかどうかチェック
     if(can_express_integer($val)) {
         push @oplist, qw(% % %)
             if((0 <= $val && $val*2+1 <= $max) || ($val < 0 && $min <= $val*2-1));
-
+        
         push(@oplist, qw(<< << << >> >> >> & & & | | | ^ ^ ^))
             if(0 <= $val && ($min <= $val && $val <= $max));
     }
     else {
         ;
     }
-
+    
     push(@oplist, qw(< <= == != >= > && ||))
         if($val == 0 || $val == 1);
-
+    
     return $oplist [rand @oplist];
 }
 
@@ -387,7 +386,7 @@ sub decide_multi_ref_var {
     
 #########################  変数を再利用する確率  ###############################
 
-    my $prob = 0; # 変数を再利用する確率
+    my $prob = 0.0; # 変数を再利用する確率
     
 ################################################################################
 

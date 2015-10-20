@@ -5,22 +5,21 @@ use warnings;
 use Carp ();
 use Time::HiRes qw(usleep ualarm gettimeofday tv_interval);
 
+use Orange4::Dumper;
+
 use Orange4::Mini::Bottomup;
 use Orange4::Mini::Constant;
 use Orange4::Mini::Compute;
 use Orange4::Mini::Expression;
 use Orange4::Mini::Topdown;
 use Orange4::Mini::Var;
-use Orange4::Dumper;
 use Orange4::Mini::Util;
 use Orange4::Mini::For;
 use Orange4::Mini::If;
 
-
-use Data::Dumper;
-
 sub new {
     my ( $class, $config, $roots, $vars, $assigns, %args ) = @_;
+    
     bless {
         config  => $config,
         roots   => $roots,
@@ -35,6 +34,7 @@ sub new {
 
 sub new_minimize {
     my $self = shift;
+    
     if ( !$self->first_check ) {
         return 1;
     }
@@ -71,6 +71,7 @@ sub first_check {
     }
     my $execTime = int tv_interval( $t0, $t1 );
     $self->{status}->{time_out} = $execTime * 2 > 5 ? $execTime * 2 : 5;
+    
     return $rreproducible;
 }
 
@@ -92,7 +93,7 @@ sub _new_minimize_first_assign_minimize {
     my $self = shift;
     
     # if ( $self->_new_minimize_top_down ) { $self->_new_minimize_first_inorder; }
-    # else                                                                 { $self->_new_minimize_first_preorder; }
+    # else                                 { $self->_new_minimize_first_preorder; }
     
     $self->_new_minimize_first_inorder; 
 }
@@ -107,12 +108,13 @@ sub _new_minimize_top_down {
             $self->_print("\n------ TOP-DOWN EXPRESSION REDUCE(t$i) ------\n");
             my $topdown = Orange4::Mini::Topdown->new(
                 $self->{config}, $self->{vars}, $self->{assigns},
-                run        => $self->{run},
+                run    => $self->{run},
                 status => $self->{status},
             );
             $update = $topdown->top_down_prepare($i) ? 1 : $update;
         }
     }
+    
     return $update;
 }
 
@@ -126,12 +128,13 @@ sub _new_minimize_final_top_down {
             $self->_print("\n------ TOP-DOWN FINAL EXPRESSION REDUCE(t$i) ------\n");
             my $topdown = Orange4::Mini::Topdown->new(
                 $self->{config}, $self->{vars}, $self->{assigns},
-                run        => $self->{run},
+                run    => $self->{run},
                 status => $self->{status},
             );
             $update = $topdown->top_down_final_prepare($i) ? 1 : $update;
         }
     }
+    
     return $update;
 }
 
@@ -171,6 +174,23 @@ sub _new_minimize_first_preorder {
     }
 }
 
+sub _new_minimize_first_for_tree_minimize {
+    my $self = shift;
+    
+    my $update = 0;
+    
+    $self->_must_print("------ FOR TREE MINIMIZE ------\n");
+    
+    my $for = Orange4::Mini::For->new(
+        $self->{config}, $self->{vars}, $self->{assigns},
+        run    => $self->{run},
+        status => $self->{status},
+    );
+    $update = $for->tree_minimize($self->{roots});
+    
+    return $update;
+}
+
 sub _new_minimize_first_if_tree_minimize {
     my $self = shift;
     
@@ -183,17 +203,22 @@ sub _new_minimize_first_if_tree_minimize {
         run    => $self->{run},
         status => $self->{status},
     );
-    do {
-        $update = $if->if_tree_minimize( $self->{roots} );
-    } while ( $update == 1 );
+    $update = $if->tree_minimize($self->{roots});
+    
+    return $update;
 }
 
 sub _new_minimize_first {
     my $self = shift;
     
+    my $update = 0;
+    
     $self->_new_minimize_first_binary_texpression_cut;
     $self->_new_minimize_first_assign_minimize;
-    $self->_new_minimize_first_if_tree_minimize;
+    do {
+        $update = $self->_new_minimize_first_for_tree_minimize;
+        $update = $self->_new_minimize_first_if_tree_minimize;
+    } while ( $update == 1 );
 }
 
 sub _new_minimize_second_and_after_lossy_texpression_cut {
@@ -209,6 +234,7 @@ sub _new_minimize_second_and_after_lossy_texpression_cut {
         );
         $update = $expression->lossy_texpression_cut_possible ? 1 : 0;
     }
+    
     return $update;
 }
 
@@ -223,6 +249,7 @@ sub _new_minimize_second_and_after_assign_minimize {
         $update = $self->_new_minimize_second_and_after_possible_postorder ? 1 : $update;
         $update_top_post = $update ? $update : $update_top_post;
     } while ( $update > 0 );
+    
     return $update_top_post;
 }
 
@@ -254,6 +281,7 @@ sub _new_minimize_second_and_after_possible_postorder {
             } while ( $update == 1 );
         }
     }
+    
     return $update_postorder;
 }
 
@@ -268,6 +296,7 @@ sub _new_minimize_second_and_after_postorder {
     );
     my $s = '$assigns->[' . $i . ']';
     my $assign_in_locate = 'BLANK';
+    
     return $bottomup->minimize_postorder( $self->{assigns}->[$i]->{root}, $i, $s, \$assign_in_locate ) ? 1 : 0;
 }
 
@@ -276,6 +305,7 @@ sub _new_minimize_second_and_after_var_constant_minimize {
     
     my $update = $self->_new_minimize_second_and_after_varset_minimize ? 1 : 0;
     $update = $self->_new_minimize_second_and_after_constant_minimize ? 1 : $update;
+    
     return $update;
 }
 
@@ -284,6 +314,7 @@ sub _new_minimize_final_var_constant_minimize {
     
     my $update = $self->_new_minimize_final_varset_minimize ? 1 : 0;
     $update = $self->_new_minimize_final_constant_minimize ? 1 : $update;
+    
     return $update;
 }
 
@@ -296,6 +327,7 @@ sub _new_minimize_second_and_after_varset_minimize {
         run    => $self->{run},
         status => $self->{status},
     );
+    
     return $var->_minimize_var ? 1 : 0;
 }
 
@@ -308,6 +340,7 @@ sub _new_minimize_final_varset_minimize {
         run    => $self->{run},
         status => $self->{status},
     );
+    
     return $var->_minimize_var_final ? 1 : 0;
 }
 
@@ -320,6 +353,7 @@ sub _new_minimize_second_and_after_constant_minimize {
         run    => $self->{run},
         status => $self->{status},
     );
+    
     return $constant->_minimize_constant ? 1 : 0;
 }
 
@@ -332,6 +366,7 @@ sub _new_minimize_final_constant_minimize {
         run    => $self->{run},
         status => $self->{status},
     );
+    
     return $constant->_minimize_constant_final ? 1 : 0;
 }
 
@@ -362,18 +397,20 @@ sub _generate_and_test {
     
     return Orange4::Mini::Compute->new(
         $self->{config}, $self->{vars}, $self->{assigns},
-        run        => $self->{run},
+        run    => $self->{run},
         status => $self->{status},
     )->_generate_and_test;
 }
 
 sub _print {
     my ( $self, $body ) = @_;
+    
     Orange4::Mini::Util::print( $self->{status}->{debug}, $body );
 }
 
 sub _must_print {
     my ( $self, $body ) = @_;
+    
     print $body;
 }
 
