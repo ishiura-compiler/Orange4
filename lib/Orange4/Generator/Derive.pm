@@ -6,10 +6,10 @@ use strict;
 use warnings;
 
 use Carp ();
-#use Math::BigInt lib => 'GMP';
+use Math::BigInt lib => 'GMP';
 #use Math::BigInt;
 use Math::BigFloat;
-use Math::BigFloat lib => 'GMP';
+#use Math::BigFloat lib => 'GMP';
 use Math::Prime::Util qw/:all/;
 use List::Util;
 

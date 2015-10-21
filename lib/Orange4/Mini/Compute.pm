@@ -202,7 +202,8 @@ sub _tval_compute_assigns {
 
 sub tval_compute {
     my ( $self, $i ) = @_;
-    
+    print "aaaaa\n";
+    <STDIN>;
     # return UNDEF ? 2 : 0;
     # return EXIST ? 1 : 0;
     return $self->_tval_compute_assigns($i);
@@ -214,9 +215,7 @@ sub reset_tvar_and_compute_exist {
     
     my $assign_var_locate = [];
     my $name = 't' . $number;
-    my $exist =
-        $self->_search_range_assigns_var( $begin_number, $name,
-        $assign_var_locate );
+    my $exist = $self->_search_range_assigns_var( $begin_number, $name, $assign_var_locate );
     
     for my $var ( @{ $self->{vars} } ) {
         my $var_name = $var->{name_type} . $var->{name_num};

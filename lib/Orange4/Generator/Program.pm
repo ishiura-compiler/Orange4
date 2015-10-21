@@ -482,7 +482,7 @@ sub generate_assign_statement {
         $val = $self->val_with_suffix( $statement->{val}, $statement->{type} );
         $self->mark_used_vars( $statement->{root}, $varset );
         #$statement->{var}->{used} = 1;
-        $test_name = "t$self->{tvar_count}";
+        $test_name = "t$statement->{name_num}";
         $test .= "$tab$test_name = @{[$self->tree_sprint($statement->{root})]};\n";
         if ( $statement->{print_statement} && $statement->{path} == 1) {
             $specifier = $self->{config}->get('type')->{$type}->{printf_format};
@@ -490,7 +490,7 @@ sub generate_assign_statement {
             $fmt       = "\"@{[$specifier]}\"";
             $check .= "\t";
             $check .= "if ($COMPARE) { OK(); } ";
-            $check .= "else { NG(" . "\"$test_name\", " . "$fmt, t$self->{tvar_count}); }\n";
+            $check .= "else { NG(" . "\"$test_name\", " . "$fmt, t$statement->{name_num}); }\n";
         }
         $self->{tvar_count}++;
     }
@@ -769,7 +769,7 @@ sub make_c_var_declaration {
     for my $k (@$varset) {
         my $val = $self->val_with_suffix( $k->{ival}, $k->{type} );
         if ( $k->{name_type} eq "t" ) {
-            #if ( $k->{used} == 1 ) {
+            if ( $k->{used} == 1 ) {
                 $declaration .= $indent;
                 $declaration .= "$k->{class} "
                 if ( $DR_mode == 1 && $k->{class} ne '' );
@@ -779,7 +779,7 @@ sub make_c_var_declaration {
                 $declaration .= "$k->{name_type}" . "$k->{name_num}";
                 $declaration .= " = $val" unless ( $DR_mode == 2 );
                 $declaration .= ";\n";
-           #}
+           }
         }
         else {
             if ( $k->{used} == 1 ) {
