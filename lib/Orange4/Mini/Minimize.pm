@@ -18,16 +18,16 @@ use Orange4::Mini::For;
 use Orange4::Mini::If;
 
 sub new {
-    my ( $class, $config, $roots, $vars, $assigns, %args ) = @_;
+    my ( $class, $config, $statements, $vars, $assigns, %args ) = @_;
     
     bless {
-        config  => $config,
-        roots   => $roots,
-        vars    => $vars,
-        assigns => $assigns,
-        run     => $args{run},
-        status  => $args{status},
-        backup  => Orange4::Mini::Backup->new( $vars, $assigns ),
+        config     => $config,
+        statements => $statements,
+        vars       => $vars,
+        assigns    => $assigns,
+        run        => $args{run},
+        status     => $args{status},
+        backup     => Orange4::Mini::Backup->new( $vars, $assigns ),
         %args,
     }, $class;
 }
@@ -169,7 +169,7 @@ sub _new_minimize_for_and_if_arguments {
         status => $self->{status},
     );
     do {
-        $update = $bottomup->minimize_for_and_if_arguments( $self->{roots} );
+        $update = $bottomup->minimize_for_and_if_arguments( $self->{statements} );
     } while ( $update == 1 );
 }
 
@@ -203,7 +203,7 @@ sub _new_minimize_first_for_tree_minimize {
         run    => $self->{run},
         status => $self->{status},
     );
-    $update = $for->tree_minimize($self->{roots});
+    $update = $for->tree_minimize($self->{statements});
     
     return $update;
 }
@@ -220,7 +220,7 @@ sub _new_minimize_first_if_tree_minimize {
         run    => $self->{run},
         status => $self->{status},
     );
-    $update = $if->tree_minimize($self->{roots});
+    $update = $if->tree_minimize($self->{statements});
     
     return $update;
 }
@@ -403,10 +403,17 @@ sub _new_minimize_second_and_after {
             $update = $self->_new_minimize_second_and_after_var_constant_minimize ? 2 : $update;
             $count++;
         } while ( $update == 2 && $count < 20 );
-        # $update = $self->_new_minimize_final_assign_minimize       ? 3 : $update;
+        # $update = $self->_new_minimize_final_assign_minimize     ? 3 : $update;
         $update = $self->_new_minimize_final_var_constant_minimize ? 3 : $update;
         $count++;
     } while ( $update == 3 && $count < 30 );
+    $update = 0;
+    $count  = 0;
+    do {
+        $update = $self->_new_minimize_first_for_tree_minimize;
+        $update = $self->_new_minimize_first_if_tree_minimize;
+        $count++;
+    } while ( $update == 1 && $count < 10 );
 }
 
 sub _generate_and_test {

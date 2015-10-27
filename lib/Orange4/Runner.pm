@@ -186,10 +186,10 @@ sub _randomtest {
     
     my $test_ng = 0;
     
-    my ( $varset, $roots ) = $self->_generate_vars_and_roots;
+    my ( $varset, $statements ) = $self->_generate_vars_and_statements;
     
     my $generator = Orange4::Generator::Program->new($config);
-    $generator->generate_program( $varset, $roots );
+    $generator->generate_program( $varset, $statements );
     
     for my $option ( @{ $config->get('options') } ) {
         my $compiler = Orange4::Runner::Compiler->new(
@@ -219,7 +219,7 @@ sub _randomtest {
             
             my $content = Orange4::Dumper->new(
                 vars  => $varset,
-                roots => $roots,
+                statements => $statements,
                 )->all(
                 expression_size => $self->{generator}->expression_size,
                 root_size       => $self->{generator}->root_max,
@@ -259,7 +259,7 @@ sub _init {
     $self->_copy_config();
 }
 
-sub _generate_vars_and_roots {
+sub _generate_vars_and_statements {
     my $self = shift;
     
     $self->{generator} = Orange4::Generator->new(
@@ -268,7 +268,7 @@ sub _generate_vars_and_roots {
     );
     $self->{generator}->run;
     
-    return ( $self->{generator}->{vars}, $self->{generator}->{roots} );
+    return ( $self->{generator}->{vars}, $self->{generator}->{statements} );
 }
 
 sub _error_header {
@@ -315,11 +315,7 @@ $header_message
 
 sub _log_name {
     my $time = shift;
-
-    # my ($sec, $min, $hour, $mday, $mon, $year) = localtime($time);
-    # $year += 1900;
-    # $mon  += 1;
-    # return "${year}${mon}${mday}-${hour}${min}${sec}";
+    
     return POSIX::strftime "%Y%m%d-%H%M%S", localtime($time);
 }
 
@@ -338,7 +334,6 @@ options:
     -n NUM  The number of programs to be tested.
     -s SEED The initial seed number.
     -h      display this help and exit.
-
 
 Usage: perl script/mini.pl [file|directory]
 

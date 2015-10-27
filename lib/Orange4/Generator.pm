@@ -14,11 +14,11 @@ sub new {
     my ( $class, %args ) = @_;
     
     my $vars  = $args{vars}  || [];
-    my $roots = $args{roots} || [];
+    my $statements = $args{statements} || [];
     
     bless {
         root         => {}, # unnecessary ?
-        roots        => $roots,
+        statements   => $statements,
         undef_seeds  => [],
         vars         => $vars,
         vars_on_path => [],
@@ -36,7 +36,7 @@ sub run {
     
     unless ( $self->{config}->get('debug_mode') ) {
         local $| = 1;
-        print "seed : $self->{seed}\t                                   ";
+        print "seed : $self->{seed}\t                                    ";
         print "\r";
         local $| = 0;
         print "seed : $self->{seed}\t";
@@ -109,7 +109,7 @@ sub generate_x_vars {
         push @{ $self->{vars_on_path} }, $var;
         
         unless ( $self->{config}->get('debug_mode') ) { #unless or if??
-            if ( $number % 100 == 1 ) {
+            if ( $number % 100 == 0 ) {
                 local $| = 1;
                 print "seed : $self->{seed}\t";
                 print "generate var now.. ($number/$self->{var_max})      ";
@@ -118,6 +118,7 @@ sub generate_x_vars {
             }
         }
     }
+    #@{$self->{vars_on_path}} = sort {$a->{val} <=> $b->{val}} @{$self->{vars_on_path}};
 }
 
 sub _generate_x_var {
@@ -228,10 +229,10 @@ sub generate_statements {
     
     my $statements = $self->generate_statement(1, $rest_of_roots, 1);
     if( ref($statements) eq 'ARRAY' ) {
-        push @{$self->{roots}}, @$statements;
+        push @{$self->{statements}}, @$statements;
     }
     else {
-        push @{$self->{roots}}, $statements;
+        push @{$self->{statements}}, $statements;
     }
 }
 
@@ -243,7 +244,7 @@ sub generate_statement {
     my $root_use_num;
     
     do {
-        my $nest_path = 1; # 再帰呼び出し時に渡す$path
+        my $nest_path = 1; # 再帰呼び出し時に渡す path
         if ( $depth == 1 ) {
             if ( !($self->{config}->get('debug_mode')) ) {
                 local $| = 1;
@@ -255,20 +256,21 @@ sub generate_statement {
         }
         
         # ブロック内の文数がかたよらないように調整
-        if ( $rest_of_roots < 20 ) {
-            $root_use_num = int(rand($rest_of_roots-1)) + 1;
+        if ( $rest_of_roots != 0 && $rest_of_roots < 20 ) {
+            $root_use_num = int(rand($rest_of_roots)) + 1;
+        }
+        elsif ( $rest_of_roots >= 20 ) {
+            $root_use_num = int(rand(19)) + 1;
         }
         else {
-            $root_use_num = int(rand(19)) + 1;
+            $root_use_num = 0;
         }
         $rest_of_roots -= $root_use_num;
         
-        # for, ifはそれぞれ2割の確率で出現
+        # for, if はそれぞれ2割の確率で出現
         my $st_type_rand = int(rand 10);
         if ( $depth <= scalar(@{$self->{config}->get('loop_var_name')}) &&
-            $st_type_rand > 7 &&
-            $root_use_num >= 3
-        ) {
+             $st_type_rand > 7 && $root_use_num >= 3 ) {
             my $st_type = 'for';
             my $loop_var_name = $self->{config}->get('loop_var_name');
             my $name_type = "$loop_var_name->[$depth-1]";
@@ -289,6 +291,7 @@ sub generate_statement {
                 scope     => "",
                 used      => 1,
             };
+            $root_use_num -= 3;
             
             # forは2種類のパターン
             my $loop_type = int(rand(2));
@@ -354,7 +357,7 @@ sub generate_statement {
                 $nest_path = 0;
             }
             
-            my $body = $self->generate_statement($depth+1, $root_use_num - 3, $nest_path);
+            my $body = $self->generate_statement($depth+1, $root_use_num, $nest_path);
             
             my $st = +{
                 st_type           => $st_type,
@@ -371,7 +374,8 @@ sub generate_statement {
             
             push @$statements, $st;
         }
-        elsif( $st_type_rand <= 7 && $st_type_rand > 5 && $root_use_num >= 1 ) {
+        elsif( $depth <= scalar(@{$self->{config}->get('loop_var_name')}) &&
+               $st_type_rand <= 7 && $st_type_rand > 5 && $root_use_num >= 1 ) {
             my $st_type = 'if';
             my $exp_cond;
             my $st_then;
@@ -387,6 +391,7 @@ sub generate_statement {
                 scope     => "",
                 used      => 1,
             };
+            $root_use_num -= 1;
             
             # ifは4種類のパターン
             my $if_type = int(rand(4));
@@ -396,14 +401,14 @@ sub generate_statement {
                 $exp_cond = $self->generate_expressions(0, $path, $var);
                 if ( $path == 0 ) { $nest_path = 0; }
                 else { $nest_path = 1; }
-                $st_then = $self->generate_statement($depth+1, $root_use_num - 1, $nest_path);
+                $st_then = $self->generate_statement($depth+1, $root_use_num, $nest_path);
                 $st_else = [];
             }
             elsif ( $if_type == 1 ) { # ifのみ && 偽
                 $var->{val} = 0;
                 $exp_cond = $self->generate_expressions(0, $path, $var);
                 $nest_path = 0;
-                $st_then = $self->generate_statement($depth+1, $root_use_num - 1, $nest_path);
+                $st_then = $self->generate_statement($depth+1, $root_use_num, $nest_path);
                 $st_else = [];
             }
             elsif ( $if_type == 2 ) { # elseあり && 真
@@ -412,16 +417,18 @@ sub generate_statement {
                 $exp_cond = $self->generate_expressions(0, $path, $var);
                 if ( $path == 0 ) { $nest_path = 0; }
                 else { $nest_path = 1; }
-                $st_then = $self->generate_statement($depth+1, $root_use_num - 1, $nest_path);
-                $st_else = $self->generate_statement($depth+1, $root_use_num - 1, 0);
+                my $root_use_num_then = int(rand($root_use_num));
+                $st_then = $self->generate_statement($depth+1, $root_use_num_then, $nest_path);
+                $st_else = $self->generate_statement($depth+1, $root_use_num - $root_use_num_then, 0);
             }
             else { # elseあり && 偽
                 $var->{val} = 0;
                 $exp_cond = $self->generate_expressions(0, $path, $var);
                 if ( $path == 0 ) { $nest_path = 0; }
                 else { $nest_path = 1; }
-                $st_then = $self->generate_statement($depth+1, $root_use_num - 1, 0);
-                $st_else = $self->generate_statement($depth+1, $root_use_num - 1, $nest_path);
+                my $root_use_num_then = int(rand($root_use_num));
+                $st_then = $self->generate_statement($depth+1, $root_use_num_then, 0);
+                $st_else = $self->generate_statement($depth+1, $root_use_num - $root_use_num_then, $nest_path);
             }
             
             my $st = +{
@@ -435,7 +442,7 @@ sub generate_statement {
             push @$statements, $st;
         }
         else {
-            for ( 0 .. $root_use_num ) {
+            for ( 0 .. $root_use_num - 1 ) {
                 my $st_type = 'assign';
                 my $expression = $self->generate_expressions(1, $path, undef);
                 my $assign = +{
@@ -465,11 +472,11 @@ sub generate_expressions {
         t => [],
     };
     
-    @{$vars_sorted_by_value->{t}} = sort {$a->{val} <=> $b->{val}} @{$self->{vars_on_path}};
+    #@{$vars_sorted_by_value->{t}} = @{$self->{vars_on_path}};
     
     # 値を展開し, 式を生成
     $self->generate_expression_by_derivation(
-        $self->{vars}, $self->{vars_on_path}, $self->{expression_size}, 63, $self->{tval_count}, $vars_sorted_by_value, $var, $gen_tvar
+        $self->{expression_size}, 63, $vars_sorted_by_value, $var, $gen_tvar
     );
     $vars_sorted_by_value->{current_vars_size} = $#{$self->{vars_on_path}};
     
@@ -480,8 +487,11 @@ sub generate_expressions {
             $self->{root}->{out}->{val},
             $self->{tval_count}
         );
-        if ( $path == 0 ) { $t_var->{ival} = $self->{root}->{out}->{val}; }
-        if ( $path == 1 ) { push @{$self->{vars_on_path}}, $t_var }
+        #if ( $path == 0 ) { $t_var->{ival} = $self->{root}->{out}->{val}; }
+        if ( $path == 1 ) { 
+            #$self->_insertion_sort($t_var);
+            push @{$self->{vars_on_path}}, $t_var;
+        }
         push @{$self->{vars}}, $t_var;
         $self->{tval_count}++;
         
@@ -516,14 +526,14 @@ sub _select_varnode {
 }
 
 sub generate_expression_by_derivation {
-    my ($self, $vars, $vars_on_path, $expsize, $depth, $i, $vars_sorted_by_value, $var, $gen_tvar) = @_;
+    my ($self, $expsize, $depth, $vars_sorted_by_value, $var, $gen_tvar) = @_;
     
     my $derive = Orange4::Generator::Derive->new(
-        config => $self->{config}, vars => $self->{vars}, vars_on_path => $self->{vars_on_path}
+        config => $self->{config}, vars => $self->{vars_on_path}, vars_to_push => $self->{vars}
     );
     
     if ( !defined($var) ) {
-        my $var_i = $vars->[$i];
+        my $var_i = $self->{vars}->[$self->{tval_count}];
         $self->{root} = {
             ntype => 'var',
             var => $var_i,
@@ -552,14 +562,14 @@ sub generate_expression_by_derivation {
     my $n = 0;
     my $current_vars_size = $vars_sorted_by_value->{current_vars_size};
     
-    print "------------------------- exp $i\n"
+    print "------------------------- exp $self->{tval_count}\n"
     if($self->{config}->get('debug_mode'));
     
     while(0 <= $#$leaf_nodes) {
         #$derive->update_sorted_vars(
-        #    $vars_sorted_by_value, $#$vars - $current_vars_size
+         #   $vars_sorted_by_value, $#{$self->{vars_on_path}} - $current_vars_size
         #);
-        $current_vars_size = $#$vars;
+        $current_vars_size = $#{$self->{vars_on_path}};
         
         if ( !$gen_tvar ) {
             $vars_sorted_by_value->{t} = [];
@@ -574,9 +584,24 @@ sub generate_expression_by_derivation {
     }
 }
 
+sub _insertion_sort {
+    my ( $self, $var ) = @_;
+    
+    my $pushed = 0;
+    
+    for my $pos ( 0 .. $#{$self->{vars_on_path}} ) {
+        if ( $self->{vars_on_path}->[$pos]->{val} >= $var->{val} ) {
+            splice @{$self->{vars_on_path}}, $pos, 0, $var;
+            $pushed = 1;
+            last;
+        }
+    }
+    push @{$self->{vars_on_path}}, $var if ( $pushed == 0 );
+}
+
 # Accessor
 sub vars            { @{ shift->{vars} }; }
-sub roots           { @{ shift->{roots} }; }
+sub statements      { @{ shift->{statements} }; }
 sub expression_size { shift->{expression_size}; }
 sub root_max        { shift->{root_max}; }
 sub var_max         { shift->{var_max}; }

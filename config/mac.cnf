@@ -2,7 +2,7 @@
   debug_mode => 0,
   
   # Multiplication of number of operators and expressionis
-  e_size_num => 100,
+  e_size_num => 1000,
   
   # Option of the compiler, separated by commas
   options => [ "-O0", "-O3" ],

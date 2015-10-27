@@ -4,7 +4,7 @@ use parent 'Orange4::Generator';
 
 use strict;
 use warnings;
-
+use Data::Dumper;
 use Carp ();
 use Math::BigInt lib => 'GMP';
 #use Math::BigInt;
@@ -2794,7 +2794,7 @@ sub _make_available_type_list {
         
         # 仮数部を2進数で返す
         ($val_m, $can_express_bits) = _execute_with_cache("ARRAY", \&get_mantissa_bin, $self, $max_type, (abs $val), $val_e);
-
+        
 		# 2進数で表現した仮数部で精度が足りていないときは, 末尾が 0 か判定
         for(1 .. length $val_m) {
             if(substr($val_m, -1) eq '0') {
@@ -2810,12 +2810,12 @@ sub _make_available_type_list {
     }
     # どの型を選択した場合汎整数拡張が起こるか判定
     my ($lower_type, $upper_type) = $self->judge_integral_promotion();
-
+    
     # 使用可能な型の配列を作成
     my ($min, $max) = 0;
     for my $i (@{$self->{config}->get('types')}) {
         ($min, $max) = $self->get_type_min_max($i);
-
+        
         if($type->{$i}->{order} <= $type->{$max_type}->{order}) {
             if($max_type !~ m/(float|double)$/ && $i =~ m/signed/ && $can_use_integer) {
                 if($i =~ m/^signed/) {
@@ -2867,10 +2867,10 @@ sub _make_available_type_list {
             last;
         }
     }
-
+    
     Carp::croak "Can not select type with $op, $val, max type is $max_type"
         unless(@typelist);
-
+    
     return @typelist;
 }
 
@@ -3106,11 +3106,12 @@ sub make_new_varnode {
             class     => $config->get('classes')->[rand @{$config->get('classes')}],
             modifier  => $config->get('modifiers')->[rand @{$config->get('modifiers')}],
             scope     => $config->get('scopes')->[rand @{$config->get('scopes')}],
-			used      => 1,
+            used      => 1,
         };
-
+        
+        #$self->_insertion_sort($var);
         push @{$self->{vars}}, $var;
-		push @{$self->{vars_on_path}}, $var;
+        push @{$self->{vars_to_push}}, $var;
     }
 
     # 変数ノードの形に整える
@@ -3126,6 +3127,21 @@ sub make_new_varnode {
         if(defined $in->{multi_ref_var});
 
     return $varnode;
+}
+
+sub _insertion_sort {
+    my ( $self, $var ) = @_;
+    
+    my $pushed = 0;
+    
+    for my $pos ( 0 .. scalar(@{$self->{vars}})-1 ) {
+        if ( $self->{vars}->[$pos]->{val} >= $var->{val} ) {
+            splice @{$self->{vars}}, $pos, 0, $var;
+            $pushed = 1;
+            last;
+        }
+    }
+    push @{$self->{vars}}, $var if ( $pushed == 0 );
 }
 
 # 選んだ変数の型が合わなければ, 必要に応じてキャストを挿入
@@ -3154,21 +3170,21 @@ sub adapt_type_of_multi_ref_var {
 # 値でソートした変数の配列を更新
 sub update_sorted_vars {
     my ($self, $vars_sorted_by_value, $added_vars_num) = @_;
-
+    
     my $idx = 0;
     my $add_var = 0;
     for(my $i=0; $i < $added_vars_num; $i++) {
         $add_var = $self->{vars}->[$#{$self->{vars}} - $i];
-
+        
         if($add_var->{name_type} eq 'x') {
             # 追加する index を探索
             $idx = bin_search($add_var->{val}, $vars_sorted_by_value->{x}, 1);
             # 要素の追加
-            splice(@{$vars_sorted_by_value->{x}}, $idx, 0, $add_var);
+            splice (@{$vars_sorted_by_value->{x}}, $idx, 0, $add_var);
         }
         elsif($add_var->{name_type} eq 't') {
             $idx = bin_search($add_var->{val}, $vars_sorted_by_value->{t}, 1);
-            splice(@{$vars_sorted_by_value->{t}}, $idx, 0, $add_var);
+            splice (@{$vars_sorted_by_value->{t}}, $idx, 0, $add_var);
         }
         else {
             Carp::croak "Invalid var: $add_var->{name_type}$add_var->{name_num}";
@@ -3280,8 +3296,7 @@ sub new_random_range
     return $rand_val;
 }
 
-sub _max
-{
+sub _max {
     my ($a, $b) = @_;
 
     if ($a > $b) {
@@ -3297,11 +3312,11 @@ my %_cache;
 my $count = 0;
 sub _execute_with_cache {
     my ($type, $sub, @a) = @_;
-
+    
     if ($count == 0) {
         %_cache = ();
     }
-
+    
     if (! defined $_cache{$sub, @a}) {
         $count = ($count+1) % CACHE_CHECK_CYCLE;
         if ($type eq "ARRAY") {
@@ -3312,7 +3327,7 @@ sub _execute_with_cache {
             $_cache{$sub, @a} = &$sub(@a);
         }
     }
-
+    
     if ($type eq "ARRAY") {
         return @{$_cache{$sub, @a}};
     }

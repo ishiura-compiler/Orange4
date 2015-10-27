@@ -293,16 +293,16 @@ sub _assign_put {
     }
 }
 
-sub _put_roots_from_assign {
-    my ($self, $roots) = @_;
+sub _put_statements_from_assign {
+    my ($self, $statements) = @_;
     
-    foreach my $st (@$roots ) {
+    foreach my $st (@$statements ) {
         if ( $st->{st_type} eq 'for' ) {
-            $self->_put_roots_from_assign($st->{statements});
+            $self->_put_statements_from_assign($st->{statements});
         }
         elsif ( $st->{st_type} eq 'if' ) {
-            $self->_put_roots_from_assign($st->{st_then});
-            $self->_put_roots_from_assign($st->{st_else});
+            $self->_put_statements_from_assign($st->{st_then});
+            $self->_put_statements_from_assign($st->{st_else});
         }
         elsif ( $st->{st_type} eq 'assign' ) {
             my $assigns_num = $st->{assigns_num};
@@ -320,10 +320,10 @@ sub _generate_test_program {
     my $self = shift;
     
     $self->_assign_put;
-    $self->_put_roots_from_assign($self->{generator}->{roots});
+    $self->_put_statements_from_assign($self->{generator}->{statements});
     
     my $generator = Orange4::Generator::Program->new( $self->{config} );
-    $generator->generate_program( $self->{vars}, $self->{generator}->{roots} );
+    $generator->generate_program( $self->{vars}, $self->{generator}->{statements} );
     $self->{generate_test}->{program} = $generator->program;
 }
 

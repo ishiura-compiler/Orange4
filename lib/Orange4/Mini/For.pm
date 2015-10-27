@@ -23,7 +23,7 @@ sub new {
 }
 
 sub tree_minimize { 
-    my ($self, $roots) = @_;
+    my ($self, $statements) = @_;
     
     my $update = 0;
     
@@ -36,7 +36,7 @@ sub tree_minimize {
 # 4 ... 全て出力
 ########
     
-    foreach my $st ( @$roots ) {
+    for my $st ( @$statements ) {
         if ( $st->{st_type} eq "for" ) {
             if ( $st->{print_tree} == 1 ) {
                 $st->{print_tree} = 0;
@@ -65,11 +65,15 @@ sub tree_minimize {
                 }
             }
             elsif ( $st->{print_tree} == 4 ) {
-                $self->tree_minimize($st->{st_then});
+                $self->tree_minimize($st->{statements});
             }
             else {;}
         }
-        else {;}
+        elsif ( $st->{st_type} eq "if" ) {
+            $self->tree_minimize($st->{st_then});
+            $self->tree_minimize($st->{st_else});
+        }
+        else { ; }
     }
     
     return $update;

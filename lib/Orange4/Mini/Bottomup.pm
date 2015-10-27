@@ -201,11 +201,11 @@ sub try_reduce {
 }
 
 sub minimize_for_and_if_arguments {
-    my ( $self, $roots ) = @_;
+    my ( $self, $statements ) = @_;
     
     my $update = 0;
     
-    foreach my $st ( @$roots ) {
+    foreach my $st ( @$statements ) {
         if ( $st->{st_type} eq "for" ) {
             $update = $self->minimize_inorder_head( $st->{init_st}->{root}, 0 );
             $update = $self->minimize_inorder_head( $st->{continuation_cond}->{root}, 0 );

@@ -12,64 +12,63 @@ sub new {
 }
 
 sub _check_structure {
-    my ( $self, $roots ) = @_;
+    my ( $self, $statements ) = @_;
     
-    foreach my $i ( 0 .. $#{$roots} ) {
-        my $root_i = $roots->[$i];
-        if ( defined ( $root_i->{st_type} ) ) {
-            if( $root_i->{st_type} eq 'for' ) {
-                unless ( defined ($root_i->{loop_var_name}) )     { Carp::croak( "undefined loop_var_name($i)" ); }
-                unless ( defined ($root_i->{init_st}) )           { Carp::croak( "undefined init_st($i)" ); }
-                unless ( defined ($root_i->{continuation_cond}) ) { Carp::croak( "undefined continuation_cond($i)" ); }
-                unless ( defined ($root_i->{re_init_st}) )        { Carp::croak( "undefined re_init_st($i)" ); }
-                unless ( defined ($root_i->{inequality_sign}) )   { Carp::croak( "undefined inequality_sign($i)" ); }
-                unless ( defined ($root_i->{statements}) )        { Carp::croak( "undefined statements($i)" ); }
+    foreach my $st ( @$statements ) {
+        if ( defined ( $st->{st_type} ) ) {
+            if( $st->{st_type} eq 'for' ) {
+                unless ( defined ($st->{loop_var_name}) )     { Carp::croak( "undefined loop_var_name" ); }
+                unless ( defined ($st->{init_st}) )           { Carp::croak( "undefined init_st" ); }
+                unless ( defined ($st->{continuation_cond}) ) { Carp::croak( "undefined continuation_cond" ); }
+                unless ( defined ($st->{re_init_st}) )        { Carp::croak( "undefined re_init_st" ); }
+                unless ( defined ($st->{inequality_sign}) )   { Carp::croak( "undefined inequality_sign" ); }
+                unless ( defined ($st->{statements}) )        { Carp::croak( "undefined statements" ); }
             }
-            elsif( $root_i->{st_type} eq 'if' ) {
-                unless (defined ($root_i->{exp_cond}) ) { Carp::croak( "undefined exp_cond($i)" ); }
-                unless (defined ($root_i->{st_then}) )  { Carp::croak( "undefined st_then($i)" ); }
-                unless (defined ($root_i->{st_else}) )  { Carp::croak( "undefined st_else($i)" ); }
+            elsif( $st->{st_type} eq 'if' ) {
+                unless (defined ($st->{exp_cond}) ) { Carp::croak( "undefined exp_cond" ); }
+                unless (defined ($st->{st_then}) )  { Carp::croak( "undefined st_then" ); }
+                unless (defined ($st->{st_else}) )  { Carp::croak( "undefined st_else" ); }
             }
-            elsif ( $root_i->{st_type} eq 'assign' ) {
-                if ( defined ( $root_i->{print_statement} ) && $root_i->{print_statement} ) {
-                    if ( $root_i->{var}->{type} eq $root_i->{type} ) { ; }
-                    else { Carp::croak( "type ne assgign-var-type($i)" ); }
-                    if ( $root_i->{var}->{val} eq $root_i->{val} ) { ; }
-                    else { Carp::croak( "val ne assgign-var-val($i)" ); }
-                    if ( defined ( $root_i->{root}->{out}->{type} ) ) { ; }
-                    else { Carp::croak( "undefined root-out-type($i)" ); }
-                    if ( defined ( $root_i->{root}->{out}->{val} ) ) { ; }
-                    else { Carp::croak( "undefined root-out-val($i)" ); }
-                    if ( defined ( $root_i->{root}->{ntype} ) ) { ; }
-                    else { Carp::croak( "undefined root-ntype($i)" ); }
-                    if ( defined ( $root_i->{root}->{otype} ) ) { ; }
-                    else { Carp::croak( "undefined root-otype($i)" ); }
-                    if ( $root_i->{root}->{out}->{type} eq $root_i->{type} ) { ; }
-                    else { Carp::croak( "type ne root-out-type($i)" ); }
-                    if ( $root_i->{root}->{out}->{val} eq $root_i->{val} ) { ; }
-                    else { Carp::croak( "val ne root-out-val($i)" ); }
+            elsif ( $st->{st_type} eq 'assign' ) {
+                if ( defined ( $st->{print_statement} ) && $st->{print_statement} ) {
+                    if ( $st->{var}->{type} eq $st->{type} ) { ; }
+                    else { Carp::croak( "type ne assgign-var-type($st->{name_num})" ); }
+                    if ( $st->{var}->{val} eq $st->{val} ) { ; }
+                    else { Carp::croak( "val ne assgign-var-val($st->{name_num})" ); }
+                    if ( defined ( $st->{root}->{out}->{type} ) ) { ; }
+                    else { Carp::croak( "undefined root-out-type($st->{name_num})" ); }
+                    if ( defined ( $st->{root}->{out}->{val} ) ) { ; }
+                    else { Carp::croak( "undefined root-out-val($st->{name_num})" ); }
+                    if ( defined ( $st->{root}->{ntype} ) ) { ; }
+                    else { Carp::croak( "undefined root-ntype($st->{name_num})" ); }
+                    if ( defined ( $st->{root}->{otype} ) ) { ; }
+                    else { Carp::croak( "undefined root-otype($st->{name_num})" ); }
+                    if ( $st->{root}->{out}->{type} eq $st->{type} ) { ; }
+                    else { Carp::croak( "type ne root-out-type($st->{name_num})" ); }
+                    if ( $st->{root}->{out}->{val} eq $st->{val} ) { ; }
+                    else { Carp::croak( "val ne root-out-val($st->{name_num})" ); }
                 }
-                elsif ( defined ( $root_i->{print_statement} ) && !$root_i->{print_statement} ) { ; }
-                else { Carp::croak( "undefined print_statement($i)" ); }
-                if ( defined ( $root_i->{var} ) ) { ; }
-                else { Carp::croak( "undefined assgign-var($i)" ); }
-                if ( defined ( $root_i->{type} ) ) { ; }
-                else { Carp::croak( "undefined assgign-type($i)" ); }
-                if ( defined ( $root_i->{val} ) ) { ; }
-                else { Carp::croak( "undefined assgign-val($i)" ); }
+                elsif ( defined ( $st->{print_statement} ) && !$st->{print_statement} ) { ; }
+                else { Carp::croak( "undefined print_statement($st->{name_num})" ); }
+                if ( defined ( $st->{var} ) ) { ; }
+                else { Carp::croak( "undefined assgign-var($st->{name_num})" ); }
+                if ( defined ( $st->{type} ) ) { ; }
+                else { Carp::croak( "undefined assgign-type($st->{name_num})" ); }
+                if ( defined ( $st->{val} ) ) { ; }
+                else { Carp::croak( "undefined assgign-val($st->{name_num})" ); }
             }
             else {
-                Carp::croak( "unexpected st_type($i)" );
+                Carp::croak( "unexpected st_type($st->{st_type})" );
             }
         }
         else {
-            Carp::croak( "undefined st_type($i)" );
+            Carp::croak( "undefined st_type" );
         }
     }
 }
 
 sub generate_program {
-    my ( $self, $varset, $roots ) = @_;
+    my ( $self, $varset, $statements ) = @_;
     
     my $config = $self->{config};
     my %declared_name = ();
@@ -132,17 +131,17 @@ sub generate_program {
     chomp ($MACROS_2);
     #chomp($header);
     
-    # root structure check
-    $self->_check_structure($roots);
+    # statements structure check
+    $self->_check_structure($statements);
     
     # not display variables that are not used
-    $self->reset_varset_used($varset, $roots);
+    $self->reset_varset_used($varset, $statements);
     
     $self->{tvar_count} = 0;
     $self->{used_loop_var_name_tmp} = ();
     $self->{cvar_count} = 0;
     
-    my $st = $self->generate_statements($roots, $varset, "\t");
+    my $st = $self->generate_statements($statements, $varset, "\t");
     $test .= $st->{test};
     $check .= $st->{check};
     $cvar_check .= $st->{cvar_check};
@@ -223,6 +222,8 @@ sub generate_statements {
                 my $for_st = $self->generate_for_statement($st, $varset, "$tab");
                 $test .= $for_st->{test};
                 $check .= $for_st->{check};
+                $cvar_check .= $for_st->{cvar_check};
+                $cvar_declaration .= $for_st->{cvar_declaration};
             }
             elsif ( $st->{st_type} eq 'if' ) {
                 my $if_st = $self->generate_if_statement($st, $varset, "$tab");
@@ -285,7 +286,7 @@ sub generate_for_statement {
 	    else {
             $test .= "$tab" . "for( $statement->{loop_var_name} = @{[$self->tree_sprint($statement->{init_st}->{root})]}; ";
             $test .= "$statement->{loop_var_name} $statement->{inequality_sign} @{[$self->tree_sprint($statement->{continuation_cond}->{root})]}; ";
-            $test .= "$statement->{loop_var_name} $statement->{operator} @{[$self->tree_sprint($statement->{re_init_st}->{root})]}) {\n";
+            $test .= "$statement->{loop_var_name} $statement->{operator} @{[$self->tree_sprint($statement->{re_init_st}->{root})]}) { ; }\n";
             push @{$self->{used_loop_var_name_tmp}}, $statement->{loop_var_name};
         }
     }
@@ -307,8 +308,8 @@ sub generate_for_statement {
         $specifier = $self->{config}->get('type')->{$type}->{printf_format};
         $compare = "$test_name == $val";
         $fmt = "\"@{[$specifier]}\"";
-        $cvar_check .= "if ($compare) { OK(); } ";
-        $cvar_check .= "else { NG($fmt, $test_name); }\n\t";
+        $cvar_check .= "$tab" . "if ($compare) { OK(); } ";
+        $cvar_check .= "$tab" . "else { NG(" . "\"$test_name\", " . "$fmt, $test_name ); }\n";
         $cvar_declaration .= "$type $test_name = $val;\n";
         $self->{cvar_count}++;
         
@@ -320,8 +321,8 @@ sub generate_for_statement {
         $specifier = $self->{config}->get('type')->{$type}->{printf_format};
         $compare = "$test_name == $val";
         $fmt = "\"@{[$specifier]}\"";
-        $cvar_check .= "if ($compare) { OK(); } ";
-        $cvar_check .= "else { NG($fmt, $test_name); }\n\t";
+        $cvar_check .= "$tab" . "if ($compare) { OK(); } ";
+        $cvar_check .= "$tab" . "else { NG(" . "\"$test_name\", " . "$fmt, $test_name ); }\n";
         $cvar_declaration .= "$type $test_name = $val;\n";
         $self->{cvar_count}++;
         
@@ -333,8 +334,8 @@ sub generate_for_statement {
         $specifier = $self->{config}->get('type')->{$type}->{printf_format};
         $compare = "$test_name == $val";
         $fmt = "\"@{[$specifier]}\"";
-        $cvar_check .= "if ($compare) { OK(); } ";
-        $cvar_check .= "else { NG($fmt, $test_name); }\n\t";
+        $cvar_check .= "$tab" . "if ($compare) { OK(); } ";
+        $cvar_check .= "$tab" . "else { NG(" . "\"$test_name\", " . "$fmt, $test_name ); }\n";
         $cvar_declaration .= "$type $test_name = $val;\n";
         $self->{cvar_count}++;
         
@@ -345,7 +346,6 @@ sub generate_for_statement {
             $cvar_check .= $st->{cvar_check};
             $cvar_declaration .= $st->{cvar_declaration};
         }
-        
     }
     else { ; }
     
@@ -386,7 +386,7 @@ sub generate_if_statement {
             $test .= "$tab}\n";
         }
 	    else {
-            $test .= "$tab" . "if( @{[$self->tree_sprint($statement->{exp_cond}->{root})]} ) {;}\n";
+            $test .= "$tab" . "if( @{[$self->tree_sprint($statement->{exp_cond}->{root})]} ) { ; }\n";
         }
         if ( @{$statement->{st_else}} ) {
             $test .= "$tab" . "else {\n";
@@ -431,7 +431,7 @@ sub generate_if_statement {
         
         $fmt = "\"@{[$specifier]}\"";
         $cvar_check .= "if ($compare) { OK(); } ";
-        $cvar_check .= "else { NG($fmt, $test_name); }\n\t";
+        $cvar_check .= "else { NG(" . "\"$test_name\", " . "$fmt, $test_name ); }\n";
         
         $cvar_declaration .= "$type ";
         $cvar_declaration .= "$test_name";
@@ -502,68 +502,66 @@ sub generate_assign_statement {
 }
 
 sub reset_varset_used {
-    my ( $self, $varset, $roots ) = @_;
+    my ( $self, $varset, $statements ) = @_;
     
     #varsetis Hashed (Speeding up)
     my $varset_hash = $self->hash_varset($varset);
     for my $var (@$varset) {
         $var->{used} = 0;
     }
-    $self->_hash_from_root( $roots, $varset_hash );
-    $self->_check_used_from_hash( $roots, $varset_hash );
+    $self->_hash_from_statement( $statements, $varset_hash );
+    $self->_check_used_from_hash( $statements, $varset_hash );
 }
 
-sub _hash_from_root {
-    my ( $self, $roots, $varset_hash ) = @_;
-    for my $i ( 0 .. $#{$roots} ) {
-        my $root_i = $roots->[$i];
-        if ( $root_i->{st_type} eq 'for' ) {
-            $self->reset_varset_used2( $root_i->{init_st}->{root}, $varset_hash );
-            $self->reset_varset_used2( $root_i->{continuation_cond}->{root}, $varset_hash );
-            $self->reset_varset_used2( $root_i->{re_init_st}->{root}, $varset_hash );
-            $self->_hash_from_root( $root_i->{statements}, $varset_hash );
+sub _hash_from_statement {
+    my ( $self, $statements, $varset_hash ) = @_;
+    for my $st ( @$statements ) {
+        if ( $st->{st_type} eq 'for' ) {
+            $self->reset_varset_used2( $st->{init_st}->{root}, $varset_hash );
+            $self->reset_varset_used2( $st->{continuation_cond}->{root}, $varset_hash );
+            $self->reset_varset_used2( $st->{re_init_st}->{root}, $varset_hash );
+            $self->_hash_from_statement( $st->{statements}, $varset_hash );
         }
-        elsif ( $root_i->{st_type} eq 'if' ) {
-            if ($root_i->{print_tree} != 0) {
-	            $self->reset_varset_used2($root_i->{exp_cond}->{root}, $varset_hash);
+        elsif ( $st->{st_type} eq 'if' ) {
+            if ($st->{print_tree} != 0) {
+	            $self->reset_varset_used2($st->{exp_cond}->{root}, $varset_hash);
             }
-            if ( ($root_i->{print_tree} == 1)
-              || ($root_i->{print_tree} == 2 && $root_i->{exp_cond}->{val} != 0) 
-              || ($root_i->{print_tree} == 3 && $root_i->{exp_cond}->{val} != 0)
-              || ($root_i->{print_tree} == 4)
-              || ($root_i->{print_tree} == 0 && $root_i->{exp_cond}->{val} != 0)) {
-	            $self->_hash_from_root( $root_i->{st_then}, $varset_hash );
+            if ( ($st->{print_tree} == 1)
+              || ($st->{print_tree} == 2 && $st->{exp_cond}->{val} != 0) 
+              || ($st->{print_tree} == 3 && $st->{exp_cond}->{val} != 0)
+              || ($st->{print_tree} == 4)
+              || ($st->{print_tree} == 0 && $st->{exp_cond}->{val} != 0)) {
+	            $self->_hash_from_statement( $st->{st_then}, $varset_hash );
             }
-            if ( ($root_i->{print_tree} == 1)
-              || ($root_i->{print_tree} == 2 && $root_i->{exp_cond}->{val} == 0)
-              || ($root_i->{print_tree} == 3 && $root_i->{exp_cond}->{val} == 0)
-              || ($root_i->{print_tree} == 4)
-              || ($root_i->{print_tree} == 0 && $root_i->{exp_cond}->{val} == 0)) {
-	        $self->_hash_from_root( $root_i->{st_else}, $varset_hash );
+            if ( ($st->{print_tree} == 1)
+              || ($st->{print_tree} == 2 && $st->{exp_cond}->{val} == 0)
+              || ($st->{print_tree} == 3 && $st->{exp_cond}->{val} == 0)
+              || ($st->{print_tree} == 4)
+              || ($st->{print_tree} == 0 && $st->{exp_cond}->{val} == 0)) {
+	            $self->_hash_from_statement( $st->{st_else}, $varset_hash );
             }
         }
-        elsif ( $root_i->{print_statement} && $root_i->{st_type} eq 'assign' ) {
-            $self->reset_varset_used2( $root_i->{root}, $varset_hash );
-            $root_i->{var}->{used} = 1;
+        elsif ( $st->{print_statement} && $st->{st_type} eq 'assign' ) {
+            $self->reset_varset_used2( $st->{root}, $varset_hash );
+            $st->{var}->{used} = 1;
         }
         else {;}
     }
 }
 
 sub _check_used_from_hash {
-    my ( $self, $roots, $varset_hash ) = @_;
-    for my $i ( 0 .. $#{$roots} ) {
-        my $root_i = $roots->[$i];
-        if ( $root_i->{print_statement} && $root_i->{st_type} eq 'assign' ) {
-            my $key = 't' . $root_i->{name_num};
+    my ( $self, $statements, $varset_hash ) = @_;
+    for my $st ( @$statements ) {
+        if ( $st->{print_statement} && $st->{st_type} eq 'assign' ) {
+            my $key = 't' . $st->{name_num};
             $$varset_hash{$key}->{used} = 1;
         }
-        elsif ( $root_i->{st_type} eq 'for' ) {
-            $self->_check_used_from_hash( $root_i->{statements}, $varset_hash );
+        elsif ( $st->{st_type} eq 'for' ) {
+            $self->_check_used_from_hash( $st->{statements}, $varset_hash );
         }
-        elsif ( $root_i->{st_type} eq 'if' ) {
-            $self->_check_used_from_hash( $root_i->{st_then}, $varset_hash );
-            $self->_check_used_from_hash( $root_i->{st_else}, $varset_hash );
+        elsif ( $st->{st_type} eq 'if' ) {
+            $self->_check_used_from_hash( $st->{st_then}, $varset_hash );
+            $self->_check_used_from_hash( $st->{st_else}, $varset_hash );
         }
         else { ; }
     }

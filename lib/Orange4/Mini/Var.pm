@@ -33,7 +33,7 @@ sub _unused_var_non_display {
     
     # Variables that are not used do not appear (Organization of used)
     my $obj = Orange4::Generator::Program->new( $self->{config} );
-    $obj->reset_varset_used( $self->{vars}, $self->{run}->{generator}->{roots} );
+    $obj->reset_varset_used( $self->{vars}, $self->{run}->{generator}->{statements} );
     
     # my $ans = $self->_generate_and_test;
     my $ans = $self->_dump_test( 0, 0 );

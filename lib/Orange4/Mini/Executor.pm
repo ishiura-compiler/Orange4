@@ -19,9 +19,9 @@ sub new {
             compiler  => $args{compiler},
             executor  => $args{executor},
             generator => Orange4::Generator->new(
-                vars   => $args{content}->{vars},
-                roots  => $args{content}->{roots},
-                config => $args{config},
+                vars       => $args{content}->{vars},
+                statements => $args{content}->{statements},
+                config     => $args{config},
             ),
         },
         status => {
@@ -49,7 +49,7 @@ sub execute {
     $self->_print("\n****** NEXT MINIMIZE: $self->{status}->{file} ******");
     my $guard = Orange4::Util::Chdir->new( $self->{mini_dir} );
     my $minimize = Orange4::Mini::Minimize->new(
-        $self->{config}, $self->{run}->{generator}->{roots},
+        $self->{config}, $self->{run}->{generator}->{statements},
         $self->{vars}, $self->{assigns},
         run    => $self->{run},
         status => $self->{status},
@@ -63,8 +63,8 @@ sub execute {
 sub _make_assigns {
     my $self    = shift;
     
-    my $roots = $self->{run}->{generator}->{roots};
-    $self->_make_assigns_from_st($roots);
+    my $statements = $self->{run}->{generator}->{statements};
+    $self->_make_assigns_from_st($statements);
 }
 
 sub _zantei_var_tansaku {
@@ -78,9 +78,9 @@ sub _zantei_var_tansaku {
 }
 
 sub _make_assigns_from_st {
-    my ($self, $roots) = @_;
+    my ($self, $statements) = @_;
     
-    foreach my $st ( @$roots ) {
+    foreach my $st ( @$statements ) {
         if ( $st->{st_type} eq 'for' ) {
              $self->_make_assigns_from_st($st->{statements});
         }
@@ -138,7 +138,7 @@ sub _message {
 sub _log {
     my ( $self, $file_name ) = @_;
     
-    my $roots = $self->{run}->{generator}->{roots};
+    my $statements = $self->{run}->{generator}->{statements};
     my $to = $file_name;
     $to =~ s/\.pl$//;
     my $header  = $self->{status}->{header};
@@ -153,7 +153,7 @@ sub _log {
     
     my $content = Orange4::Dumper->new(
             vars  => $self->{vars},
-            roots => $roots,
+            statements => $statements,
         )->all(
             expression_size => $self->{status}->{exp_size},
             root_size       => $self->{status}->{root_size},

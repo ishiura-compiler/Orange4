@@ -9,18 +9,18 @@ use Math::BigInt;
 sub new {
     my ( $class, %args ) = @_;
     
-    for my $key (qw(vars roots)) {
+    for my $key (qw(vars statements)) {
         unless ( exists $args{$key} ) {
             Carp::croak("Missing mandatory parameter: $key");
         }
     }
     
     my $vars  = delete $args{vars};
-    my $roots = delete $args{roots};
+    my $statements = delete $args{statements};
     
     bless {
         vars  => $vars,
-        roots => $roots,
+        statements => $statements,
         %args
     }, $class;
 }
@@ -34,13 +34,13 @@ sub all {
         push @params, "$key => $args{$key},";
     }
     
-    return join "\n", "+{", @params, $self->_vars, $self->_roots, "}";
+    return join "\n", "+{", @params, $self->_vars, $self->_statements, "}";
 }
 
-sub vars_and_roots {
+sub vars_and_statements {
     my $self = shift;
     
-    return join "\n", $self->_vars, $self->_roots;
+    return join "\n", $self->_vars, $self->_statements;
 }
 
 sub _vars {
@@ -93,21 +93,21 @@ sub _bigint_dumper {
     return $content;
 }
 
-sub _roots {
+sub _statements {
     my $self = shift;
     
-    my $roots = $self->{roots};
+    my $statements = $self->{statements};
     my $indent = '';
     
-    my $s = "roots => [\n";
-    $s .= _roots_dumper($roots, $indent);
+    my $s = "statements => [\n";
+    $s .= _statements_dumper($statements, $indent);
     $s .= "],";
     
     return $s;
 }
 
-sub _roots_dumper {
-    my ($roots, $pre_indent) = @_;
+sub _statements_dumper {
+    my ($statements, $pre_indent) = @_;
     
     my $indent1 = $pre_indent . ' ';
     my $indent2 = $pre_indent . '  ';
@@ -115,7 +115,7 @@ sub _roots_dumper {
     my $n = "\n";
     my $s = '';
     
-    for my $st ( @$roots ) {
+    for my $st ( @$statements ) {
         if ( $st->{st_type} eq 'for' ) {
             $s .= $pre_indent . '{' . $n;
             $s .= $indent1 . "'st_type'=>'$st->{st_type}'," . $n;
@@ -146,7 +146,7 @@ sub _roots_dumper {
             $s .= $indent2 . "'val'=>'$st->{re_init_st}->{val}'," . $n;
             $s .= $indent1 . "}," . $n;
             $s .= $indent1 . "'statements'=> [\n";
-            $s .= _roots_dumper($st->{statements}, $indent2);
+            $s .= _statements_dumper($st->{statements}, $indent2);
             $s .= $indent1 . "]," . $n;
             $s .= $pre_indent . '},' . $n;
         }
@@ -162,10 +162,10 @@ sub _roots_dumper {
             $s .= $indent2 . "'val'=>'$st->{exp_cond}->{val}'," . $n;
             $s .= $indent1 . "}," . $n;
             $s .= $indent1 . "'st_then'=> [\n";
-            $s .= _roots_dumper($st->{st_then}, $indent2);
+            $s .= _statements_dumper($st->{st_then}, $indent2);
             $s .= $indent1 . "]," . $n;
             $s .= $indent1 . "'st_else'=> [\n";
-            $s .= _roots_dumper($st->{st_else}, $indent2);
+            $s .= _statements_dumper($st->{st_else}, $indent2);
             $s .= $indent1 . "]," . $n;
             $s .= $pre_indent . '},' . $n;
         }
