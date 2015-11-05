@@ -4,7 +4,7 @@ use parent 'Orange4::Generator';
 
 use strict;
 use warnings;
-use Data::Dumper;
+
 use Carp ();
 use Math::BigInt lib => 'GMP';
 #use Math::BigInt;
@@ -1871,15 +1871,24 @@ sub get_random_value {
 =cut
             }
             else {
-                $res = new_random_range(
-                    $rand_info->{rand_min}, $rand_info->{rand_max}
-                    );
+#### edited
+                my $rand = int(rand(10));
+                if ( $rand < 1 ) { $res = $rand_info->{rand_min}; }
+                elsif ( 1 <= $rand && $rand < 2 ) { $res = $rand_info->{rand_max}; }
+                elsif ( 2 <= $rand && $rand < 3 ) { 
+                    if ( $rand_info->{rand_min} <= -1 && -1 <= $rand_info->{rand_max} ) {
+                        $res = -1;
+                    }
+                    else { $res = new_random_range( $rand_info->{rand_min}, $rand_info->{rand_max} ); }
+                }
+                else { $res = new_random_range( $rand_info->{rand_min}, $rand_info->{rand_max} ); }
+                #$res = new_random_range( $rand_info->{rand_min}, $rand_info->{rand_max} );
             }
         }
     }
-
+    
     $res = _to_big_num($res_type, $res);
-
+    
     return $res;
 }
 

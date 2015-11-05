@@ -32,7 +32,13 @@ sub run {
     
     $self->_init();
     $self->generate_x_vars();
-    $self->generate_statements();
+    my $statements = $self->generate_statements(1, $self->{root_max}, 1);
+    if( ref($statements) eq 'ARRAY' ) {
+        push @{$self->{statements}}, @$statements;
+    }
+    else {
+        push @{$self->{statements}}, $statements;
+    }
     
     unless ( $self->{config}->get('debug_mode') ) {
         local $| = 1;
@@ -222,29 +228,12 @@ sub _random_change_sign {
 }
 
 sub generate_statements {
-    my $self = shift;
-    
-    my $undef_root = 0;
-    my $rest_of_roots = $self->{root_max};
-    
-    my $statements = $self->generate_statement(1, $rest_of_roots, 1);
-    if( ref($statements) eq 'ARRAY' ) {
-        push @{$self->{statements}}, @$statements;
-    }
-    else {
-        push @{$self->{statements}}, $statements;
-    }
-}
-
-sub generate_statement {
     my ($self, $depth, $rest_of_roots, $path) = @_;
-    
     
     my $statements = [];
     my $root_use_num;
     
     do {
-        my $nest_path = 1; # 再帰呼び出し時に渡す path
         if ( $depth == 1 ) {
             if ( !($self->{config}->get('debug_mode')) ) {
                 local $| = 1;
@@ -254,6 +243,8 @@ sub generate_statement {
                 local $| = 0;
             }
         }
+        
+        my $nest_path = 1; # 再帰呼び出し時に渡す path
         
         # ブロック内の文数がかたよらないように調整
         if ( $rest_of_roots != 0 && $rest_of_roots < 20 ) {
@@ -267,192 +258,32 @@ sub generate_statement {
         }
         $rest_of_roots -= $root_use_num;
         
-        # for, if はそれぞれ2割の確率で出現
+        # for, if はそれぞれ20%の確率で出現
         my $st_type_rand = int(rand 10);
-        if ( $depth <= scalar(@{$self->{config}->get('loop_var_name')}) &&
-             $st_type_rand > 7 && $root_use_num >= 3 ) {
-            my $st_type = 'for';
-            my $loop_var_name = $self->{config}->get('loop_var_name');
-            my $name_type = "$loop_var_name->[$depth-1]";
-            my $init_st;
-            my $continuation_cond;
-            my $re_init_st;
-            my $inequality_sign;
-            my $operator;
-            my $loop_path;
-            my $var =  +{
-                name_type => 'for',
-                name_num  => 0,
-                type      => 'signed int',
-                ival      => undef,
-                val       => undef,
-                class     => "",
-                modifier  => "",
-                scope     => "",
-                used      => 1,
-            };
-            $root_use_num -= 3;
-            
-            # forは2種類のパターン
-            my $loop_type = int(rand(2));
-            if( $loop_type == 0 ) { # ループ回数1回
-                $loop_path = 1;
-                $var->{val} = $self->define_value( $var->{type} );
-                $init_st = $self->generate_expressions(0, $path, $var);
-                $var->{val} = $self->define_value( $var->{type} );
-                $continuation_cond = $self->generate_expressions(0, $path, $var);
-                if ( int(rand(2)) ) {
-                    $operator = '+=';
-                    $var->{val} = $continuation_cond->{val} - $init_st->{val};
-                }
-                else {
-                    $operator = '-=';
-                    $var->{val} = $init_st->{val} - $continuation_cond->{val};
-                }
-                if ( $init_st->{val} == $continuation_cond->{val} ) {
-                    if ( $init_st->{val} == $self->{config}->get('type')->{$init_st->{type}}->{max} ) {
-                        $inequality_sign = '>=';
-                        $operator = '-=';
-                        $var->{val} = 1;
-                    }
-                    else {
-                        $inequality_sign = '<=';
-                        $operator = '+=';
-                        $var->{val} = 1;
-                    }
-                }
-                elsif ( $init_st->{val} > $continuation_cond->{val} ) {
-                    $inequality_sign = '>';
-                }
-                else {
-                    $inequality_sign = '<';
-                }
-                $re_init_st = $self->generate_expressions(0, $path, $var);
-                
-                if ( $path == 0 ) { $nest_path = 0; }
-                else { $nest_path = 1; }
-            }
-            else { # ループ回数0回
-                $loop_path = 0;
-                $var->{val} = $self->define_value( $var->{type} );
-                $init_st = $self->generate_expressions(0, $path, $var);
-                $var->{val} = $self->define_value( $var->{type} );
-                $continuation_cond = $self->generate_expressions(0, $path, $var);
-                if ( $init_st->{val} > $continuation_cond->{val} ) {
-                    $inequality_sign = '<=';
-                }
-                else {
-                    $inequality_sign = '>';
-                }
-                if ( int(rand(2)) ) {
-                    $operator = '+=';
-                    $var->{val} = $continuation_cond->{val} - $init_st->{val};
-                }
-                else {
-                    $operator = '-=';
-                    $var->{val} = $init_st->{val} - $continuation_cond->{val};
-                }
-                $re_init_st = $self->generate_expressions(0, $path, $var);
-                
-                $nest_path = 0;
-            }
-            
-            my $body = $self->generate_statement($depth+1, $root_use_num, $nest_path);
-            
-            my $st = +{
-                st_type           => $st_type,
-                loop_var_name     => $name_type,
-                init_st           => $init_st,
-                continuation_cond => $continuation_cond,
-                re_init_st        => $re_init_st,
-                inequality_sign   => $inequality_sign,
-                operator          => $operator,
-                statements        => $body,
-                loop_path         => $loop_path,
-                print_tree        => 1,
-            };
-            
+        
+        if ( $depth <= $#{$self->{config}->get('loop_var_name')} + 1
+            && $st_type_rand > 7
+            && $root_use_num >= 3 ) {
+            my $st = $self->generate_for_statement($depth, $path, $root_use_num);
             push @$statements, $st;
         }
-        elsif( $depth <= scalar(@{$self->{config}->get('loop_var_name')}) &&
-               $st_type_rand <= 7 && $st_type_rand > 5 && $root_use_num >= 1 ) {
-            my $st_type = 'if';
-            my $exp_cond;
-            my $st_then;
-            my $st_else;
-            my $var =  +{
-                name_type => 'if',
-                name_num  => 0,
-                type      => random_select( $self->{config}->get('types') ),
-                ival      => undef,
-                val       => undef,
-                class     => "",
-                modifier  => "",
-                scope     => "",
-                used      => 1,
-            };
-            $root_use_num -= 1;
-            
-            # ifは4種類のパターン
-            my $if_type = int(rand(4));
-            if ( $if_type == 0 ) { # ifのみ && 真
-                $var->{val} = $self->define_value( $var->{type} );
-                if ( $var->{val} == 0 ) { $var->{val} = 1; $var->{type} = 'signed int'; }
-                $exp_cond = $self->generate_expressions(0, $path, $var);
-                if ( $path == 0 ) { $nest_path = 0; }
-                else { $nest_path = 1; }
-                $st_then = $self->generate_statement($depth+1, $root_use_num, $nest_path);
-                $st_else = [];
-            }
-            elsif ( $if_type == 1 ) { # ifのみ && 偽
-                $var->{val} = 0;
-                $exp_cond = $self->generate_expressions(0, $path, $var);
-                $nest_path = 0;
-                $st_then = $self->generate_statement($depth+1, $root_use_num, $nest_path);
-                $st_else = [];
-            }
-            elsif ( $if_type == 2 ) { # elseあり && 真
-                $var->{val} = $self->define_value( $var->{type} );
-                if ( $var->{val} == 0 ) { $var->{val} = 1; $var->{type} = 'signed int'; }
-                $exp_cond = $self->generate_expressions(0, $path, $var);
-                if ( $path == 0 ) { $nest_path = 0; }
-                else { $nest_path = 1; }
-                my $root_use_num_then = int(rand($root_use_num));
-                $st_then = $self->generate_statement($depth+1, $root_use_num_then, $nest_path);
-                $st_else = $self->generate_statement($depth+1, $root_use_num - $root_use_num_then, 0);
-            }
-            else { # elseあり && 偽
-                $var->{val} = 0;
-                $exp_cond = $self->generate_expressions(0, $path, $var);
-                if ( $path == 0 ) { $nest_path = 0; }
-                else { $nest_path = 1; }
-                my $root_use_num_then = int(rand($root_use_num));
-                $st_then = $self->generate_statement($depth+1, $root_use_num_then, 0);
-                $st_else = $self->generate_statement($depth+1, $root_use_num - $root_use_num_then, $nest_path);
-            }
-            
-            my $st = +{
-                st_type    => $st_type,
-                exp_cond   => $exp_cond,
-                st_then    => $st_then,
-                st_else    => $st_else,
-                print_tree => 1,
-            };
-            
+        elsif ( $depth <= $#{$self->{config}->get('loop_var_name')} + 1
+            && $st_type_rand > 5 && $st_type_rand <= 7
+            && $root_use_num >= 1 ) {
+            my $st = $self->generate_if_statement($depth, $path, $root_use_num);
             push @$statements, $st;
         }
         else {
-            for ( 0 .. $root_use_num - 1 ) {
-                my $st_type = 'assign';
-                my $expression = $self->generate_expressions(1, $path, undef);
+            for ( 1 .. $root_use_num ) {
+                my $exp = $self->generate_expressions(1, $path, undef);
                 my $assign = +{
-                    st_type         => $st_type,
+                    st_type         => 'assign',
                     path            => $path,
-                    type            => $expression->{type},
-                    val             => $expression->{val},
-                    root            => $expression->{root},
-                    var             => $expression->{var},
-                    name_num        => $expression->{var}->{name_num},
+                    type            => $exp->{type},
+                    val             => $exp->{val},
+                    root            => $exp->{root},
+                    var             => $exp->{var},
+                    name_num        => $exp->{var}->{name_num},
                     print_statement => 1,
                 };
                 push @$statements, $assign;
@@ -461,6 +292,166 @@ sub generate_statement {
     } while ( $rest_of_roots > 0 );
     
     return $statements;
+}
+
+sub generate_for_statement {
+    my ($self, $depth, $path, $root_use_num) = @_;
+    
+    my ($st_init, $continuation_cond, $st_reinit);
+    my ($inequality_sign, $operator, $loop_path);
+    my $nest_path = 1;
+    my $var =  +{
+        name_type => 'for',
+        name_num  => 0,
+        type      => 'signed int',
+        ival      => undef,
+        val       => undef,
+        class     => "",
+        modifier  => "",
+        scope     => "",
+        used      => 1,
+    };
+    
+    # forは2種類のパターン
+    my $loop_type = int(rand(2));
+    if( $loop_type == 1 ) { # ループ回数1回
+        $loop_path = 1;
+        $var->{val} = $self->define_value( $var->{type} );
+        $st_init = $self->generate_expressions(0, $path, $var);
+        $var->{val} = $self->define_value( $var->{type} );
+        $continuation_cond = $self->generate_expressions(0, $path, $var);
+        if ( int(rand(2)) ) {
+            $operator = '+=';
+            $var->{val} = $continuation_cond->{val} - $st_init->{val};
+        }
+        else {
+            $operator = '-=';
+            $var->{val} = $st_init->{val} - $continuation_cond->{val};
+        }
+        if ( $st_init->{val} == $continuation_cond->{val} ) {
+            if ( $st_init->{val} == $self->{config}->get('type')->{$st_init->{type}}->{max} ) {
+                $inequality_sign = '>=';
+                $operator = '-=';
+                $var->{val} = 1;
+            }
+            else {
+                $inequality_sign = '<=';
+                $operator = '+=';
+                $var->{val} = 1;
+            }
+        }
+        elsif ( $st_init->{val} > $continuation_cond->{val} ) {
+            $inequality_sign = '>';
+        }
+        else {
+            $inequality_sign = '<';
+        }
+        $st_reinit = $self->generate_expressions(0, $path, $var);
+        
+        if ( $path == 0 ) { $nest_path = 0; }
+    }
+    else { # ループ回数0回
+        $loop_path = 0;
+        $var->{val} = $self->define_value( $var->{type} );
+        $st_init = $self->generate_expressions(0, $path, $var);
+        $var->{val} = $self->define_value( $var->{type} );
+        $continuation_cond = $self->generate_expressions(0, $path, $var);
+        if ( $st_init->{val} > $continuation_cond->{val} ) {
+            $inequality_sign = '<=';
+        }
+        else {
+            $inequality_sign = '>';
+        }
+        if ( int(rand(2)) ) {
+            $operator = '+=';
+            $var->{val} = $continuation_cond->{val} - $st_init->{val};
+        }
+        else {
+            $operator = '-=';
+            $var->{val} = $st_init->{val} - $continuation_cond->{val};
+        }
+        $st_reinit = $self->generate_expressions(0, $path, $var);
+        
+        $nest_path = 0;
+    }
+    
+    return +{
+        st_type           => 'for',
+        loop_var_name     => $self->{config}->get('loop_var_name')->[$depth-1],
+        st_init           => $st_init,
+        continuation_cond => $continuation_cond,
+        st_reinit         => $st_reinit,
+        inequality_sign   => $inequality_sign,
+        operator          => $operator,
+        statements        => $self->generate_statements($depth+1, $root_use_num-3, $nest_path),
+        loop_path         => $loop_type,
+        print_tree        => 1,
+    };
+}
+
+sub generate_if_statement {
+    my ($self, $depth, $path, $root_use_num) = @_;
+    
+    my ($exp_cond, $st_then, $st_else);
+    my $nest_path = 1;
+    my $var =  +{
+        name_type => 'if',
+        name_num  => 0,
+        type      => random_select( $self->{config}->get('types') ),
+        ival      => undef,
+        val       => undef,
+        class     => "",
+        modifier  => "",
+        scope     => "",
+        used      => 1,
+    };
+    $root_use_num -= 1;
+    
+    # ifは4種類のパターン
+    my $if_type = int(rand(4));
+    if ( $if_type == 0 ) { # ifのみ && 真
+        $var->{val} = $self->define_value( $var->{type} );
+        if ( $var->{val} == 0 ) { $var->{val} = 1; $var->{type} = 'signed int'; }
+        $exp_cond = $self->generate_expressions(0, $path, $var);
+        if ( $path == 0 ) { $nest_path = 0; }
+        else { $nest_path = 1; }
+        $st_then = $self->generate_statements($depth+1, $root_use_num, $nest_path);
+        $st_else = [];
+    }
+    elsif ( $if_type == 1 ) { # ifのみ && 偽
+        $var->{val} = 0;
+        $exp_cond = $self->generate_expressions(0, $path, $var);
+        $nest_path = 0;
+        $st_then = $self->generate_statements($depth+1, $root_use_num, $nest_path);
+        $st_else = [];
+    }
+    elsif ( $if_type == 2 ) { # elseあり && 真
+        $var->{val} = $self->define_value( $var->{type} );
+        if ( $var->{val} == 0 ) { $var->{val} = 1; $var->{type} = 'signed int'; }
+        $exp_cond = $self->generate_expressions(0, $path, $var);
+        if ( $path == 0 ) { $nest_path = 0; }
+        else { $nest_path = 1; }
+        my $root_use_num_then = int(rand($root_use_num));
+        $st_then = $self->generate_statements($depth+1, $root_use_num_then, $nest_path);
+        $st_else = $self->generate_statements($depth+1, $root_use_num - $root_use_num_then, 0);
+    }
+    else { # elseあり && 偽
+        $var->{val} = 0;
+        $exp_cond = $self->generate_expressions(0, $path, $var);
+        if ( $path == 0 ) { $nest_path = 0; }
+        else { $nest_path = 1; }
+        my $root_use_num_then = int(rand($root_use_num));
+        $st_then = $self->generate_statements($depth+1, $root_use_num_then, 0);
+        $st_else = $self->generate_statements($depth+1, $root_use_num - $root_use_num_then, $nest_path);
+    }
+    
+    return +{
+        st_type    => 'if',
+        exp_cond   => $exp_cond,
+        st_then    => $st_then,
+        st_else    => $st_else,
+        print_tree => 1,
+    };
 }
 
 sub generate_expressions {
@@ -487,7 +478,6 @@ sub generate_expressions {
             $self->{root}->{out}->{val},
             $self->{tval_count}
         );
-        #if ( $path == 0 ) { $t_var->{ival} = $self->{root}->{out}->{val}; }
         if ( $path == 1 ) { 
             #$self->_insertion_sort($t_var);
             push @{$self->{vars_on_path}}, $t_var;
@@ -509,20 +499,6 @@ sub generate_expressions {
             root => $self->{root},
         };
     }
-}
-
-sub _select_varnode {
-    my $self = shift;
-    
-    my $number = 0;
-    do {
-        $number = int( rand( $self->vars ) );
-    } while ( $self->{vars}->[$number]->{name_type} eq 'k' );
-    
-    return +{
-        ntype => 'var',
-        var   => $self->{vars}->[$number],
-    };
 }
 
 sub generate_expression_by_derivation {
@@ -567,7 +543,7 @@ sub generate_expression_by_derivation {
     
     while(0 <= $#$leaf_nodes) {
         #$derive->update_sorted_vars(
-         #   $vars_sorted_by_value, $#{$self->{vars_on_path}} - $current_vars_size
+        #    $vars_sorted_by_value, $#{$self->{vars_on_path}} - $current_vars_size
         #);
         $current_vars_size = $#{$self->{vars_on_path}};
         

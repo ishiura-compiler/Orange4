@@ -18,9 +18,9 @@ sub _check_structure {
         if ( defined ( $st->{st_type} ) ) {
             if( $st->{st_type} eq 'for' ) {
                 unless ( defined ($st->{loop_var_name}) )     { Carp::croak( "undefined loop_var_name" ); }
-                unless ( defined ($st->{init_st}) )           { Carp::croak( "undefined init_st" ); }
+                unless ( defined ($st->{st_init}) )           { Carp::croak( "undefined st_init" ); }
                 unless ( defined ($st->{continuation_cond}) ) { Carp::croak( "undefined continuation_cond" ); }
-                unless ( defined ($st->{re_init_st}) )        { Carp::croak( "undefined re_init_st" ); }
+                unless ( defined ($st->{st_reinit}) )        { Carp::croak( "undefined st_reinit" ); }
                 unless ( defined ($st->{inequality_sign}) )   { Carp::croak( "undefined inequality_sign" ); }
                 unless ( defined ($st->{statements}) )        { Carp::croak( "undefined statements" ); }
             }
@@ -268,9 +268,9 @@ sub generate_for_statement {
          $statement->{print_tree} == 2 ||
          $statement->{print_tree} == 4 ) {
         if ( @{$statement->{statements}} ) {
-            $test .= "$tab" . "for( $statement->{loop_var_name} = @{[$self->tree_sprint($statement->{init_st}->{root})]}; ";
+            $test .= "$tab" . "for( $statement->{loop_var_name} = @{[$self->tree_sprint($statement->{st_init}->{root})]}; ";
             $test .= "$statement->{loop_var_name} $statement->{inequality_sign} @{[$self->tree_sprint($statement->{continuation_cond}->{root})]}; ";
-            $test .= "$statement->{loop_var_name} $statement->{operator} @{[$self->tree_sprint($statement->{re_init_st}->{root})]}) {\n";
+            $test .= "$statement->{loop_var_name} $statement->{operator} @{[$self->tree_sprint($statement->{st_reinit}->{root})]}) {\n";
             push @{$self->{used_loop_var_name_tmp}}, $statement->{loop_var_name};
             
             if ( $statement->{print_tree} == 1 || $statement->{print_tree} == 4 ||
@@ -284,9 +284,9 @@ sub generate_for_statement {
             $test .= "$tab}\n";
         }
 	    else {
-            $test .= "$tab" . "for( $statement->{loop_var_name} = @{[$self->tree_sprint($statement->{init_st}->{root})]}; ";
+            $test .= "$tab" . "for( $statement->{loop_var_name} = @{[$self->tree_sprint($statement->{st_init}->{root})]}; ";
             $test .= "$statement->{loop_var_name} $statement->{inequality_sign} @{[$self->tree_sprint($statement->{continuation_cond}->{root})]}; ";
-            $test .= "$statement->{loop_var_name} $statement->{operator} @{[$self->tree_sprint($statement->{re_init_st}->{root})]}) { ; }\n";
+            $test .= "$statement->{loop_var_name} $statement->{operator} @{[$self->tree_sprint($statement->{st_reinit}->{root})]}) { ; }\n";
             push @{$self->{used_loop_var_name_tmp}}, $statement->{loop_var_name};
         }
     }
@@ -301,10 +301,10 @@ sub generate_for_statement {
     }
     elsif ( $statement->{print_tree} == 3 ) {
         $test_name = "c$self->{cvar_count}";
-        $test .= "$tab$test_name = @{[$self->tree_sprint($statement->{init_st}->{root})]};\n";
+        $test .= "$tab$test_name = @{[$self->tree_sprint($statement->{st_init}->{root})]};\n";
         $val = Math::BigInt->new(0);
-        $type = $statement->{init_st}->{type};
-        $val = $self->val_with_suffix($statement->{init_st}->{val},$type);
+        $type = $statement->{st_init}->{type};
+        $val = $self->val_with_suffix($statement->{st_init}->{val},$type);
         $specifier = $self->{config}->get('type')->{$type}->{printf_format};
         $compare = "$test_name == $val";
         $fmt = "\"@{[$specifier]}\"";
@@ -327,10 +327,10 @@ sub generate_for_statement {
         $self->{cvar_count}++;
         
         $test_name = "c$self->{cvar_count}";
-        $test .= "$tab$test_name = @{[$self->tree_sprint($statement->{re_init_st}->{root})]};\n";
+        $test .= "$tab$test_name = @{[$self->tree_sprint($statement->{st_reinit}->{root})]};\n";
         $val = Math::BigInt->new(0);
-        $type = $statement->{re_init_st}->{type};
-        $val = $self->val_with_suffix($statement->{re_init_st}->{val},$type);
+        $type = $statement->{st_reinit}->{type};
+        $val = $self->val_with_suffix($statement->{st_reinit}->{val},$type);
         $specifier = $self->{config}->get('type')->{$type}->{printf_format};
         $compare = "$test_name == $val";
         $fmt = "\"@{[$specifier]}\"";
@@ -517,9 +517,9 @@ sub _hash_from_statement {
     my ( $self, $statements, $varset_hash ) = @_;
     for my $st ( @$statements ) {
         if ( $st->{st_type} eq 'for' ) {
-            $self->reset_varset_used2( $st->{init_st}->{root}, $varset_hash );
+            $self->reset_varset_used2( $st->{st_init}->{root}, $varset_hash );
             $self->reset_varset_used2( $st->{continuation_cond}->{root}, $varset_hash );
-            $self->reset_varset_used2( $st->{re_init_st}->{root}, $varset_hash );
+            $self->reset_varset_used2( $st->{st_reinit}->{root}, $varset_hash );
             $self->_hash_from_statement( $st->{statements}, $varset_hash );
         }
         elsif ( $st->{st_type} eq 'if' ) {

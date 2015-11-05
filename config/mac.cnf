@@ -5,7 +5,7 @@
   e_size_num => 1000,
   
   # Option of the compiler, separated by commas
-  options => [ "-O0", "-O3" ],
+  options => [ "-O0", "-O3", "-Os" ],
   
   # Name of C file
   source_file => 'mac-test.c',
@@ -20,7 +20,7 @@
   macro_ng => 'printf("@NG@ ("test" = " fmt ")\n",val)',
   
   # Command of the compiler
-  compiler => 'clang',
+  compiler => 'clang-3.8',
   
   # Operators, separated by spaces
   operators => [

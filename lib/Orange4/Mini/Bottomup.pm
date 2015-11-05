@@ -207,9 +207,9 @@ sub minimize_for_and_if_arguments {
     
     foreach my $st ( @$statements ) {
         if ( $st->{st_type} eq "for" ) {
-            $update = $self->minimize_inorder_head( $st->{init_st}->{root}, 0 );
+            $update = $self->minimize_inorder_head( $st->{st_init}->{root}, 0 );
             $update = $self->minimize_inorder_head( $st->{continuation_cond}->{root}, 0 );
-            $update = $self->minimize_inorder_head( $st->{re_init_st}->{root}, 0 );
+            $update = $self->minimize_inorder_head( $st->{st_reinit}->{root}, 0 );
             $update = $self->minimize_for_and_if_arguments( $st->{statements} );
         }
         elsif ( $st->{st_type} eq "if" ) {
