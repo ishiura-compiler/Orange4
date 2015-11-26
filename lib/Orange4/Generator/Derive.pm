@@ -571,7 +571,7 @@ sub derive_with_add {
     my $rand_max = $orig_val - $min;
     $rand_min = $min if($rand_min < $min);
     $rand_max = $max if($max < $rand_max);
-
+    
     my $in0 = $n->{in}->[0];
     my $in1 = $n->{in}->[1];
     my $rand_info = {};
@@ -642,7 +642,6 @@ sub derive_with_mul {
     my $orig_val = $n->{out}->{val};
     my $orig_type = $n->{out}->{type};
     my ($min, $max) = $self->get_type_min_max($orig_type);
-
     my $in0 = $n->{in}->[0];
     my $in1 = $n->{in}->[1];
     my $rand_info = {};
@@ -717,8 +716,11 @@ sub derive_with_mul {
             #my $can_express_integer = 1;
             #$can_express_integer = can_express_integer($orig_val)
             #    if($orig_type =~ m/(float|double)$/);
-
-            my $prime_decomp_val = abs $orig_val;
+            
+            # absによるオーバーフロー回避
+            my $prime_decomp_val;
+            if ( $orig_val == -9223372036854775808 ) { $prime_decomp_val= abs ($orig_val/2); }
+            else { $prime_decomp_val = abs ($orig_val); }
 #            if($can_express_integer) {
             if($orig_type !~ m/(float|double)$/) {
                 ;
@@ -757,7 +759,11 @@ sub derive_with_mul {
             else {
                 prime_decomp($prime_decomp_val, \@primes);
             }
-
+            
+            if($orig_val == -9223372036854775808) {
+                push @primes, 2;
+            }
+            
             # 素因数のリストを 2分割して, in_val を決定.
             @primes = List::Util::shuffle @primes;
             my $sep = 0;

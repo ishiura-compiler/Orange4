@@ -237,6 +237,7 @@ sub generate_statements {
                 $test .= $assign_st->{test};
                 $check .= $assign_st->{check};
             }
+            else {;}
         }
     }
     else { ; }

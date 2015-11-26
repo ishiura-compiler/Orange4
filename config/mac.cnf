@@ -1,7 +1,7 @@
 +{
   debug_mode => 0,
   
-  # Multiplication of number of operators and expressionis
+  # Multiplication of number of operators and expressions
   e_size_num => 1000,
   
   # Option of the compiler, separated by commas
