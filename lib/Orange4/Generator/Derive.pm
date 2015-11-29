@@ -4,7 +4,7 @@ use parent 'Orange4::Generator';
 
 use strict;
 use warnings;
-
+use Data::Dumper;
 use Carp ();
 use Math::BigInt lib => 'GMP';
 #use Math::BigInt;
@@ -74,7 +74,7 @@ sub _generate_random_binary {
 sub accurate_pow_of_two {
     my ($type, $exp) = @_;
     my $res = 0;
-
+    
     $res = _execute_with_cache("SCALAR", \&_pow, 2, $exp);
 =pod
     if($exp < 0) {
@@ -223,6 +223,7 @@ sub round_val {
 # 1つ目の演算子の予約. 型は次の展開でキャスト
 sub select_opcode_with_range {
     my ($self, $orig_type, $rand_min, $rand_max) = @_;
+    
     my @oplist = qw(+ + - -  * * * * / / / /);
     my $max_type = $self->get_max_inttype('unsigned');
     $max_type = $self->get_max_inttype('signed') if($rand_max < 0 || $rand_min < 0 && int rand 2);
@@ -709,113 +710,116 @@ sub derive_with_mul {
                 );
         }
         else {
-            $in0->{val} = _to_big_num($orig_type, 1);
-            $in1->{val} = _to_big_num($orig_type, 1);
-
-            # 整数で表現できるかどうか確認
-            #my $can_express_integer = 1;
-            #$can_express_integer = can_express_integer($orig_val)
-            #    if($orig_type =~ m/(float|double)$/);
-            
-            # absによるオーバーフロー回避
-            my $prime_decomp_val;
-            if ( $orig_val == -9223372036854775808 ) { $prime_decomp_val= abs ($orig_val/2); }
-            else { $prime_decomp_val = abs ($orig_val); }
-#            if($can_express_integer) {
-            if($orig_type !~ m/(float|double)$/) {
-                ;
-            }
-            else {
-                my $max = _max($self->{config}->get('type')->{$orig_type}->{e_max}, abs $self->{config}->get('type')->{$orig_type}->{e_min});
-                my $orig_val_e = _execute_with_cache("SCALAR", \&get_exponent_of_two, abs $orig_val, $max);
-                my $type = $self->{config}->get('type');
-                my $type_m_bits = $type->{$orig_type}->{bits} - 1;
-
-                if($in1->{nxt_op} =~ m/^(&|\||\^)$/ && $orig_val_e < $type_m_bits) {
-                    $in0->{val} = $orig_val;
-                    $prime_decomp_val = 1;
+            for ( my $i = 0; ; $i++ ) {
+                $in0->{val} = _to_big_num($orig_type, 1);
+                $in1->{val} = _to_big_num($orig_type, 1);
+    
+                # 整数で表現できるかどうか確認
+                #my $can_express_integer = 1;
+                #$can_express_integer = can_express_integer($orig_val)
+                #    if($orig_type =~ m/(float|double)$/);
+                
+                # absによるオーバーフロー回避
+                my $prime_decomp_val;
+                if ( $orig_val == -9223372036854775808 ) { $prime_decomp_val= abs ($orig_val/2); }
+                else { $prime_decomp_val = abs ($orig_val); }
+    #            if($can_express_integer) {
+                if($orig_type !~ m/(float|double)$/) {
+                    ;
                 }
                 else {
-                    # set exponent
-                    $orig_val_e -= $type_m_bits;
-                    my $in1_exp = int($orig_val_e / 2);
-                    $in1_exp = 0
-                        if($in1->{nxt_op} !~ m/^(\+|-|\*|\/)$/);
-                    my $in0_exp = $orig_val_e - $in1_exp;
-                    $in1->{val} = accurate_pow_of_two($orig_type, $in1_exp);
-                    $in0->{val} = accurate_pow_of_two($orig_type, $in0_exp);
-
-                    my $orig_val_m = _execute_with_cache("SCALAR", \&get_mantissa_of_two, (abs $orig_val), $orig_val_e);
-
-                    $prime_decomp_val = $orig_val_m;#Math::BigInt->new("$orig_val_m");
+                    my $max = _max($self->{config}->get('type')->{$orig_type}->{e_max}, abs $self->{config}->get('type')->{$orig_type}->{e_min});
+                    my $orig_val_e = _execute_with_cache("SCALAR", \&get_exponent_of_two, abs $orig_val, $max);
+                    my $type = $self->{config}->get('type');
+                    my $type_m_bits = $type->{$orig_type}->{bits} - 1;
+                    
+                    if($in1->{nxt_op} =~ m/^(&|\||\^)$/ && $orig_val_e < $type_m_bits) {
+                        $in0->{val} = $orig_val;
+                        $prime_decomp_val = 1;
+                    }
+                    else {
+                        # set exponent
+                        $orig_val_e -= $type_m_bits;
+                        my $in1_exp = int($orig_val_e / 2);
+                        $in1_exp = 0
+                            if($in1->{nxt_op} !~ m/^(\+|-|\*|\/)$/);
+                        my $in0_exp = $orig_val_e - $in1_exp;
+                        $in1->{val} = accurate_pow_of_two($orig_type, $in1_exp);
+                        $in0->{val} = accurate_pow_of_two($orig_type, $in0_exp);
+                        
+                        my $orig_val_m = _execute_with_cache("SCALAR", \&get_mantissa_of_two, (abs $orig_val), $orig_val_e);
+                        
+                        $prime_decomp_val = $orig_val_m;#Math::BigInt->new("$orig_val_m");
+                    }
                 }
-            }
-
-            # 素因数分解
-            my @primes = ();
-            if($prime_decomp_val == 0) {
-                push @primes, 1;
-            }
-            else {
-                prime_decomp($prime_decomp_val, \@primes);
-            }
-            
-            if($orig_val == -9223372036854775808) {
-                push @primes, 2;
-            }
-            
-            # 素因数のリストを 2分割して, in_val を決定.
-            @primes = List::Util::shuffle @primes;
-            my $sep = 0;
-            if($in1->{nxt_op} eq '%') {
-                $sep = $#primes / 2;
-
-                for my $i (0 .. $#primes) {
-                    $in0->{val} *= $primes[$i] if($sep < $i);
-                    $in1->{val} *= $primes[$i] if($i <= $sep);
-                }
-            }
-            else {
-                $sep = int(rand @primes);
-
-                for my $i (0 .. $#primes) {
-                    $in0->{val} *= $primes[$i] if($i <= $sep);
-                    $in1->{val} *= $primes[$i] if($sep < $i);
-                }
-            }
-
-            if($orig_val < 0) {
-                if($in1->{nxt_op} =~ m/^(<<|>>|&|\||\^)$/) {
-                    $in0->{val} = -$in0->{val};
+                
+                # 素因数分解
+                my @primes = ();
+                if($prime_decomp_val == 0) {
+                    push @primes, 1;
                 }
                 else {
-                    if($in0->{val} == (abs $min)) {
+                    prime_decomp($prime_decomp_val, \@primes);
+                }
+                
+                if($orig_val == -9223372036854775808) {
+                    push @primes, 2;
+                }
+                
+                # 素因数のリストを 2分割して, in_val を決定.
+                @primes = List::Util::shuffle @primes;
+                my $sep = 0;
+                if($in1->{nxt_op} eq '%') {
+                    $sep = $#primes / 2;
+                    
+                    for my $i (0 .. $#primes) {
+                        $in0->{val} *= $primes[$i] if($sep < $i);
+                        $in1->{val} *= $primes[$i] if($i <= $sep);
+                    }
+                }
+                else {
+                    $sep = int(rand @primes);
+                    
+                    for my $i (0 .. $#primes) {
+                        $in0->{val} *= $primes[$i] if($i <= $sep);
+                        $in1->{val} *= $primes[$i] if($sep < $i);
+                    }
+                }
+                
+                if($orig_val < 0) {
+                    if($in1->{nxt_op} =~ m/^(<<|>>|&|\||\^)$/) {
                         $in0->{val} = -$in0->{val};
                     }
                     else {
-                        if(int rand 2) {
+                        if($in0->{val} == (abs $min)) {
                             $in0->{val} = -$in0->{val};
                         }
                         else {
-                            $in1->{val} = -$in1->{val};
+                            if(int rand 2) {
+                                $in0->{val} = -$in0->{val};
+                            }
+                            else {
+                                $in1->{val} = -$in1->{val};
+                            }
                         }
                     }
                 }
+                
+                last if ( ($in0->{val} -1 != 9223372036854775807) && ($in1->{val} - 1 != 9223372036854775807) );
             }
         }
-
+        
         $rand_info = $self->make_rand_info($n, $in1->{val}, $in1->{val});
-
+        
         $in1->{multi_ref_var} = decide_multi_ref_var(
             $n, $rand_info, $vars_sorted_by_value, $in1->{nxt_op}
             );
-
+        
         $rand_info = $self->make_rand_info($n, $in0->{val}, $in0->{val});
         $in0->{multi_ref_var} = decide_multi_ref_var(
             $n, $rand_info, $vars_sorted_by_value
             );
     }
-
 }
 
 # 10,000 以下の素数を用いて, 素因数分解を行う.
@@ -1647,7 +1651,11 @@ sub make_rand_info {
     my $config = $self->{config};
     my $type = $config->get('type');
     my $op = $n->{otype};
+    
+   #if ( $op eq '*' && (($rand_max - 1) == 9223372036854775807) ) { $n->{out}->{type} = 'unsigned long long' }
+    
     my $max_type = $n->{out}->{type};
+    
     $max_type = $self->get_max_inttype('unsigned')
         if($op =~ m/^(<|<=|==|!=|>=|>|&&|\|\|)$/);
 #    $max_type = $config->get('types')->[-1]
@@ -1677,7 +1685,7 @@ sub make_rand_info {
         else {
             ;
         }
-
+        
         my $bit = 0; # シフト演算用. 要調整
 
         # 関係・論理演算子を予約している場合 0|1 を返す
@@ -1799,7 +1807,7 @@ sub make_rand_info {
             $rand_info->{rand_max} = _to_big_num($res_type, $rand_max);
         }
     }
-
+    
     return $rand_info;
 }
 
