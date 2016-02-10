@@ -17,8 +17,22 @@ sub run {
     my $self = shift;
     
     system "rm -f $self->{config}->{exec_file} > /dev/null";
-    ( $self->{error_msg}, $self->{command} ) =
-        $self->{compile}->( $self->{config}, $self->{option} );
+    eval {
+	local $SIG{ALRM} = sub { die "timeout" };
+	alarm 5;   #If you wanna set timeout, change here. (default 5sec)
+	( $self->{error_msg}, $self->{command} ) =
+	    $self->{compile}->( $self->{config}, $self->{option} );
+	alarm 0;
+    };
+    alarm 0;
+    if($@) {
+	if($@ =~ /timeout/) {
+	    $self->{error_msg} = "Compile-timeout";
+	    print "\@NG\@(Compile timeout) \n";
+	}
+	else {
+	}
+    }
 }
 
 sub error_msg { shift->{error_msg}; }

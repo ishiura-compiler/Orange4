@@ -212,9 +212,15 @@ sub _randomtest {
                 $executor->command, $executor->error_msg,
             );
             my $seed = $self->{seed};
-            if($executor->error_msg =~ /timeout/) {
+	    if($compiler->error_msg =~ /Compile-timeout/){
+		Orange4::Log->new(
+                	name => "error$seed\_$option\_Compile-timeout.c",
+                	dir  => $self->{log_dir}
+            	)->print( $header . $generator->program );
+	    }
+	    elsif($executor->error_msg =~ /Executor-timeout/) {
             	Orange4::Log->new(
-                	name => "error$seed\_$option\_timeout.c",
+                	name => "error$seed\_$option\_Executor-timeout.c",
                 	dir  => $self->{log_dir}
             	)->print( $header . $generator->program );
             }
@@ -234,9 +240,15 @@ sub _randomtest {
                 var_size        => $self->{generator}->var_max,
                 option          => $option
                 );
-            if($executor->error_msg =~ /timeout/) {
+            if($compiler->error_msg =~ /Executor-timeout/){
 		Orange4::Log->new(
-		    name => "error$seed\_$option\_timeout.pl",
+		    name => "error$seed\_$option\_Executor-timeout.pl",
+		    dir  => $self->{log_dir}
+		    )->print($content);
+	    }
+	    elsif($executor->error_msg =~ /Compile-timeout/) {
+		Orange4::Log->new(
+		    name => "error$seed\_$option\_Compile-timeout.pl",
 		    dir  => $self->{log_dir}
 		    )->print($content);
 	    }

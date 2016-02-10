@@ -26,9 +26,9 @@ sub run {
     alarm 0;
     if($@) {
 	if($@ =~ /timeout/) {
-	    push @{$self->{error}}, "timeout";
-	    $self->{error_msg} = "timeout";
-	    print "\@NG\@(timeout)\n";
+	    push @{$self->{error}}, "Executor-timeout";
+	    $self->{error_msg} = "Executor-timeout";
+	    print "\@NG\@(Executor timeout) \n";
 	}
 	else {
 	}
