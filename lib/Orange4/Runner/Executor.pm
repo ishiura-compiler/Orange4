@@ -16,9 +16,23 @@ sub new {
 
 sub run {
     my $self = shift;
-    
-    ( $self->{error_msg}, $self->{error}, $self->{command} ) =
-        $self->{execute}->( $self->{config} );
+    eval {
+	local $SIG{ALRM} = sub { die "timeout" };
+	alarm 2;   #If you wanna set timeout, change here. (default 2sec)
+	( $self->{error_msg}, $self->{error}, $self->{command} ) =
+	    $self->{execute}->( $self->{config} );
+	alarm 0;
+    };
+    alarm 0;
+    if($@) {
+	if($@ =~ /timeout/) {
+	    push @{$self->{error}}, "timeout";
+	    $self->{error_msg} = "timeout";
+	    print "\@NG\@(timeout)\n";
+	}
+	else {
+	}
+    }
 }
 
 sub error     { @{ shift->{error} }; }

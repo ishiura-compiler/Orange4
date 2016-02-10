@@ -1,4 +1,4 @@
-package Orange4::Runner;
+﻿package Orange4::Runner;
 
 use strict;
 use warnings;
@@ -212,10 +212,18 @@ sub _randomtest {
                 $executor->command, $executor->error_msg,
             );
             my $seed = $self->{seed};
-            Orange4::Log->new(
-                name => "error$seed\_$option.c",
-                dir  => $self->{log_dir}
-            )->print( $header . $generator->program );
+            if($executor->error_msg =~ /timeout/) {
+            	Orange4::Log->new(
+                	name => "error$seed\_$option\_timeout.c",
+                	dir  => $self->{log_dir}
+            	)->print( $header . $generator->program );
+            }
+            else {
+		Orange4::Log->new(
+                	name => "error$seed\_$option.c",
+                	dir  => $self->{log_dir}
+            	)->print( $header . $generator->program );
+            }
             
             my $content = Orange4::Dumper->new(
                 vars  => $varset,
@@ -226,14 +234,20 @@ sub _randomtest {
                 var_size        => $self->{generator}->var_max,
                 option          => $option
                 );
-            
-            Orange4::Log->new(
-                name => "error$seed\_$option.pl",
-                dir  => $self->{log_dir}
-            )->print($content);
-            
-            $test_ng = 1;
-        }
+            if($executor->error_msg =~ /timeout/) {
+		Orange4::Log->new(
+		    name => "error$seed\_$option\_timeout.pl",
+		    dir  => $self->{log_dir}
+		    )->print($content);
+	    }
+	    else {
+		Orange4::Log->new(
+		    name => "error$seed\_$option.pl",
+		    dir  => $self->{log_dir}
+		    )->print($content);
+	    }
+	    $test_ng = 1;
+	}
         else {
             print " ";
         }
