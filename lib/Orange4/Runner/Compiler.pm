@@ -19,7 +19,7 @@ sub run {
     system "rm -f $self->{config}->{exec_file} > /dev/null";
     eval {
 	local $SIG{ALRM} = sub { die "timeout" };
-	alarm 5;   #If you wanna set timeout, change here. (default 5sec)
+	alarm 5;   #If you wanna set timeout of compile, change here. (default 5sec)
 	( $self->{error_msg}, $self->{command} ) =
 	    $self->{compile}->( $self->{config}, $self->{option} );
 	alarm 0;

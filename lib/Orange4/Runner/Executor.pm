@@ -18,7 +18,7 @@ sub run {
     my $self = shift;
     eval {
 	local $SIG{ALRM} = sub { die "timeout" };
-	alarm 2;   #If you wanna set timeout, change here. (default 2sec)
+	alarm 2;   #If you wanna set timeout of execute, change here. (default 2sec)
 	( $self->{error_msg}, $self->{error}, $self->{command} ) =
 	    $self->{execute}->( $self->{config} );
 	alarm 0;
