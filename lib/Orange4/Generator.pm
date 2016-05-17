@@ -21,7 +21,11 @@ sub new {
         statements   => $statements,
         undef_seeds  => [],
         vars         => $vars,
-        vars_on_path => [],
+        vars_on_path => { x_current_vars_size =>  undef,
+                          t_current_vars_size =>  undef, #いらんけど今後使うかもしれないから
+                          x => [],
+                          t => [],
+                        },
         avoide_undef => 2,
         %args
     }, $class;
@@ -112,7 +116,7 @@ sub generate_x_vars {
         }
         $var->{val}  = $var->{ival};
         push @{ $self->{vars} }, $var;
-        push @{ $self->{vars_on_path} }, $var;
+        push @{ $self->{vars_on_path}->{x} }, $var;
         
         unless ( $self->{config}->get('debug_mode') ) { #unless or if??
             if ( $number % 100 == 0 ) {
@@ -124,7 +128,7 @@ sub generate_x_vars {
             }
         }
     }
-    #@{$self->{vars_on_path}} = sort {$a->{val} <=> $b->{val}} @{$self->{vars_on_path}};
+    @{$self->{vars_on_path}->{x}} = sort {$a->{val} <=> $b->{val}} @{$self->{vars_on_path}->{x}};
 }
 
 sub _generate_x_var {
@@ -161,11 +165,12 @@ sub _generate_value {
         $value = Math::BigInt->new(0);
     }
     else {
-        $value = Math::BigInt->new(1);
+        $value = 1;#Math::BigInt->new(1);
         for ( 1 .. $bit - 1 ) {
             $value *= 2;
             $value += int( rand(2) );
         }
+        $value = Math::BigInt->new($value);
     }
     
     return $value;
@@ -457,19 +462,11 @@ sub generate_if_statement {
 sub generate_expressions {
     my ($self, $gen_tvar, $path, $var) = @_;
     
-    my $vars_sorted_by_value = {
-        current_vars_size => $self->{root_max} - 1,
-        x => [],
-        t => [],
-    };
-    
-    #@{$vars_sorted_by_value->{t}} = @{$self->{vars_on_path}};
     
     # 値を展開し, 式を生成
     $self->generate_expression_by_derivation(
-        $self->{expression_size}, 63, $vars_sorted_by_value, $var, $gen_tvar
+        $self->{expression_size}, 63, $var, $gen_tvar
     );
-    $vars_sorted_by_value->{current_vars_size} = $#{$self->{vars_on_path}};
     
     # t式の場合とforやifの引数の場合で分岐
     if ( $gen_tvar ) {
@@ -479,8 +476,8 @@ sub generate_expressions {
             $self->{tval_count}
         );
         if ( $path == 1 ) { 
-            #$self->_insertion_sort($t_var);
-            push @{$self->{vars_on_path}}, $t_var;
+            my $idx = bin_search($t_var->{val}, $self->{vars_on_path}->{t});
+            splice (@{$self->{vars_on_path}->{t}}, $idx, 0, $t_var);
         }
         push @{$self->{vars}}, $t_var;
         $self->{tval_count}++;
@@ -495,67 +492,74 @@ sub generate_expressions {
     else {
         return +{
             type => $self->{root}->{out}->{type},
-            val => $self->{root}->{out}->{val},
+            val  => $self->{root}->{out}->{val},
             root => $self->{root},
         };
     }
 }
 
 sub generate_expression_by_derivation {
-    my ($self, $expsize, $depth, $vars_sorted_by_value, $var, $gen_tvar) = @_;
+    my ($self, $expsize, $depth, $var, $gen_tvar) = @_;
     
     my $derive = Orange4::Generator::Derive->new(
-        config => $self->{config}, vars => $self->{vars_on_path}, vars_to_push => $self->{vars}
+        config       => $self->{config}, 
+        vars         => $self->{vars_on_path}, 
+        vars_to_push => $self->{vars}, 
+        gen_tvar     => $gen_tvar, 
+        conf_type    => $self->{config}->get('type'), 
+        conf_types   => $self->{config}->get('types')
     );
     
     if ( !defined($var) ) {
         my $var_i = $self->{vars}->[$self->{tval_count}];
         $self->{root} = {
-            ntype => 'var',
-            var => $var_i,
-            ival => $var_i->{val},
+            ntype  => 'var',
+            var    => $var_i,
+            ival   => $var_i->{val},
             nxt_op => $derive->select_opcode_with_value($var_i->{val}),
         };
     }
     else {
         $self->{root} = {
-            ntype => 'var',
-            var => $var,
-            ival => $var->{val},
+            ntype  => 'var',
+            var    => $var,
+            ival   => $var->{val},
             nxt_op => $derive->select_opcode_with_value($var->{val}),
         };
     }
     
     my $node_info = {
-        ref => $self->{root},
+        ref     => $self->{root},
         expsize => $expsize,
-        depth => $depth,
+        depth   => $depth,
     };
     
     my $leaf_nodes = [];
     push @$leaf_nodes, $node_info;
     
     my $n = 0;
-    my $current_vars_size = $vars_sorted_by_value->{current_vars_size};
-    
+    $self->{vars_on_path}->{x_current_vars_size} = $#{$self->{vars_on_path}->{x}};
     print "------------------------- exp $self->{tval_count}\n"
     if($self->{config}->get('debug_mode'));
     
     while(0 <= $#$leaf_nodes) {
-        #$derive->update_sorted_vars(
-        #    $vars_sorted_by_value, $#{$self->{vars_on_path}} - $current_vars_size
-        #);
-        $current_vars_size = $#{$self->{vars_on_path}};
-        
-        if ( !$gen_tvar ) {
-            $vars_sorted_by_value->{t} = [];
-        }
         $n = $derive->derive_expression(
-            $leaf_nodes->[0]->{ref}, $vars_sorted_by_value
+            $leaf_nodes->[0]->{ref}#, $vars_sorted_by_value
         );
         
         $derive->make_leaf_nodes_info($leaf_nodes, $n);
-        
+=comment    
+    print "\n X\n";
+    for my $i (0 .. $#{$self->{vars_on_path}->{x}}) {
+        print "$self->{vars_on_path}->{x}->[$i]->{val}, $self->{vars_on_path}->{x}->[$i]->{name_num}, $self->{vars_on_path}->{x}->[$i]->{name_type}, $self->{vars_on_path}->{x}->[$i]->{type}\n";
+    }
+    print "\n\n";
+    print "\n t\n";
+    for my $i (0 .. $#{$self->{vars_on_path}->{t}}) {
+        print "$self->{vars_on_path}->{t}->[$i]->{val}, $self->{vars_on_path}->{t}->[$i]->{name_num}, $self->{vars_on_path}->{t}->[$i]->{name_type}, $self->{vars_on_path}->{t}->[$i]->{type}\n";
+    }
+    print "\n\n";
+=cut
         shift @$leaf_nodes;
     }
 }
@@ -573,6 +577,31 @@ sub _insertion_sort {
         }
     }
     push @{$self->{vars_on_path}}, $var if ( $pushed == 0 );
+}
+
+sub bin_search {
+    my ( $val, $array ) = @_;
+
+    my $head = 0;
+    my $tail = scalar @$array;
+    my $idx = 0;
+
+    while($head < $tail) {
+        $idx = int( ($head+$tail)/2 );
+
+        if((ref $val) eq 'Math::BigFloat') {
+            if($val < $array->[$idx]->{val})     { $tail = $idx; }
+            elsif($val == $array->[$idx]->{val}) { return  $idx; }
+            else                                 { $head = $idx+1; }
+        }
+        else {
+            if($array->[$idx]->{val} > $val)     { $tail = $idx; }
+            elsif($array->[$idx]->{val} == $val) { return  $idx; }
+            else                                 { $head = $idx+1; }
+        }
+    }
+
+    return $head; 
 }
 
 # Accessor

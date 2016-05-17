@@ -166,10 +166,10 @@ sub adjust_varnode {
 # 導出で作られた opノードを返す.
 # 受け取った変数ノードの値を解とする式を生成.
 sub derive_expression {
-    my ($self, $n, $vars_sorted_by_value) = @_;
+    my ($self, $n) = @_;
     
     # 導出に使う演算子ノードに変換. in を作成
-    $n = $self->varnode2opnode($n, $vars_sorted_by_value);
+    $n = $self->varnode2opnode($n);
     
     # オペランドを結合
     $self->set_operand($n);
@@ -179,7 +179,7 @@ sub derive_expression {
 
 # 導出に用いる変数を演算子ノードに変換
 sub varnode2opnode {
-    my ($self, $n, $vars_sorted_by_value) = @_;
+    my ($self, $n) = @_;
     my $orig_type = $n->{var}->{type};
     my $orig_val  = $n->{var}->{val};
     
@@ -194,7 +194,7 @@ sub varnode2opnode {
         if($self->{config}->get('debug_mode'));
     
     # $n->{in} の val, type, print_value をセット. (type は導出元と同じ)
-    $self->set_opnodein($n, $vars_sorted_by_value);
+    $self->set_opnodein($n);
     
     print "$n->{in}->[0]->{val} $n->{otype} $n->{in}->[1]->{val};\n"
         if($self->{config}->get('debug_mode'));
@@ -227,7 +227,7 @@ sub select_opcode_with_range {
     my @oplist = qw(+ + - -  * * * * / / / /);
     my $max_type = $self->get_max_inttype('unsigned');
     $max_type = $self->get_max_inttype('signed') if($rand_max < 0 || $rand_min < 0 && int rand 2);
-    my ($max_type_min, $max_type_max) = $self->get_type_min_max($max_type); # for bit op
+    my ($max_type_min, $max_type_max) = $self->get_type_min_max($max_type); # for bit op $max_typeにはコンフィグにある最大値最小値が入っていて、それらをBigIntにするためにする。
     my ($orig_type_min, $orig_type_max) = $self->get_type_min_max($orig_type); # for mod op
     my $min_mid = $orig_type_min / 2 + 1;
     my $max_mid = int($orig_type_max / 2);
@@ -264,7 +264,7 @@ sub select_opcode_with_range {
 # 2つ目の演算子を選択. 型は次の展開でキャスト
 sub select_opcode_with_value {
     my ($self, $val) = @_;
-    my $type = $self->{config}->get('type');
+    my $type = $self->{conf_type};
     my $max_type = $self->get_max_inttype('unsigned'); # for mod op
     $max_type = $self->get_max_inttype('signed') if($val < 0);
     my $min = $type->{$max_type}->{min};
@@ -297,10 +297,10 @@ sub define_derivation_var_type {
     my $op = $n->{nxt_op};
     my $orig_type = $n->{var}->{type};
     my $orig_val  = $n->{var}->{val};
-    #my $max_type = $self->{config}->get('types')->[-1];
+    #my $max_type = $self->{conf_types}->[-1];
     my $max_type = $self->get_max_inttype('unsigned');
     # -1 ... config typeリストの最後尾
-    $max_type = $self->{config}->get('types')->[-1]
+    $max_type = $self->{conf_types}->[-1]
         if($orig_type =~ m/(float|double)$/ && $op =~ m/^(\+|-|\*|\/)$/);
 
     my $new_var_type = '';
@@ -383,11 +383,11 @@ sub set_opnode_info {
 
 # 変数を再利用するかどうか決定
 sub decide_multi_ref_var {
-    my ($n, $rand_info, $vars_sorted_by_value, $nxt_op) = @_;
+    my ($n, $rand_info, $vars_on_path, $nxt_op) = @_;
     
 #########################  変数を再利用する確率  ###############################
 
-    my $prob = 0.0; # 変数を再利用する確率
+    my $prob = 1.0; # 変数を再利用する確率
     
 ################################################################################
 
@@ -402,14 +402,16 @@ sub decide_multi_ref_var {
         	############# 変数の再利用の順位 #############
         	# 1. t変数
         	# 2. x変数
-        	# 3. 新規x変数
+        	# 3. 新規x変数 ←今は無視してｘ変数でひとくくりしている
         	##############################################
-            $var_ref = select_multi_ref_var(
-                $n->{otype}, $rand_info, $vars_sorted_by_value->{t}, $nxt_op
+            
+                $var_ref = select_multi_ref_var(
+                    $n->{otype}, $rand_info, $vars_on_path->{t}, $nxt_op
                 );
+            
             unless(defined $var_ref) {
                 $var_ref = select_multi_ref_var(
-                    $n->{otype}, $rand_info, $vars_sorted_by_value->{x}, $nxt_op
+                    $n->{otype}, $rand_info, $vars_on_path->{x}, $nxt_op
                     );
             }
         }
@@ -443,6 +445,7 @@ sub select_multi_ref_var {
 
         $min_idx = bin_search($rand_min, $vars_sorted_by_value, 1);
 
+        #もしもってきた変数が$rand_minより小さい値だったら
         while($min_idx <= $#$vars_sorted_by_value &&
               $vars_sorted_by_value->[$min_idx]->{val} < $rand_min) {
             $min_idx++;
@@ -489,44 +492,44 @@ sub select_multi_ref_var {
         return;
     }
     else {
-#        print "\@reuse@, $vars_sorted_by_value->[$idx]->{val}\n";
+        #print "\@reuse@, $vars_sorted_by_value->[$idx]->{val}\n";
         return $vars_sorted_by_value->[$idx];
     }
 }
 
 # 演算子ごとに opnode の in の型と値を生成.
 sub make_opnodein {
-    my ($self, $n, $vars_sorted_by_value) = @_;
+    my ($self, $n) = @_;
     my $op = $n->{otype};
     my $orig_type = $n->{out}->{type};
 
     # 各演算子に沿い導出
     if($op eq '+') {
-        $self->derive_with_add($n, $vars_sorted_by_value);
+        $self->derive_with_add($n);
     }
     elsif($op eq '-') {
-        $self->derive_with_sub($n, $vars_sorted_by_value);
+        $self->derive_with_sub($n);
     }
     elsif($op eq '*') {
-        $self->derive_with_mul($n, $vars_sorted_by_value);
+        $self->derive_with_mul($n);
     }
     elsif($op eq '/') {
-        $self->derive_with_div($n, $n->{out}->{val}, $vars_sorted_by_value);
+        $self->derive_with_div($n, $n->{out}->{val});
     }
     elsif($op eq '%') {
-        $self->derive_with_mod($n, $vars_sorted_by_value);
+        $self->derive_with_mod($n);
     }
     elsif($op =~ m/^(<<|>>)$/) {
-        $self->derive_with_shift($n, $vars_sorted_by_value);
+        $self->derive_with_shift($n);
     }
     elsif($op =~ m/^(<|<=|==|!=|>=|>)$/) {
-        $self->derive_with_relation($n, $vars_sorted_by_value);
+        $self->derive_with_relation($n);
     }
     elsif($op =~ m/^(&&|\|\|)$/) {
-        $self->derive_with_logical($n, $vars_sorted_by_value);
+        $self->derive_with_logical($n);
     }
     elsif($op =~ m/^(&|\||\^)$/) {
-        $self->derive_with_bit($n, $vars_sorted_by_value);
+        $self->derive_with_bit($n);
     }
     else {
         Carp::croak "Invalid opcode: $op";
@@ -562,7 +565,7 @@ sub swap_opnodein {
 
 # +演算子で算術式を導出する
 sub derive_with_add {
-    my ($self, $n, $vars_sorted_by_value) = @_;
+    my ($self, $n) = @_;
     my $orig_val = $n->{out}->{val};
     my $orig_type = $n->{out}->{type};
 
@@ -584,7 +587,7 @@ sub derive_with_add {
 
     # in[1]変数を再利用するかどうか決定
     $in1->{multi_ref_var} = decide_multi_ref_var(
-        $n, $rand_info, $vars_sorted_by_value, $in1->{nxt_op}
+        $n, $rand_info, $self->{vars}, $in1->{nxt_op}
         );
 
     # in[1] の値を生成
@@ -598,13 +601,13 @@ sub derive_with_add {
 
     $rand_info = $self->make_rand_info($n, $in0->{val}, $in0->{val});
     $in0->{multi_ref_var} = decide_multi_ref_var(
-        $n, $rand_info, $vars_sorted_by_value
+        $n, $rand_info, $self->{vars}
         );
 }
 
 # -演算子で算術式を導出する
 sub derive_with_sub {
-    my ($self, $n, $vars_sorted_by_value) = @_;
+    my ($self, $n) = @_;
     my $orig_val = $n->{out}->{val};
     my $orig_type = $n->{out}->{type};
     my ($min, $max) = $self->get_type_min_max($orig_type);
@@ -621,7 +624,7 @@ sub derive_with_sub {
 
     $rand_info = $self->make_rand_info($n, $rand_min, $rand_max, $in1->{nxt_op});
     $in1->{multi_ref_var} = decide_multi_ref_var(
-        $n, $rand_info, $vars_sorted_by_value, $in1->{nxt_op}
+        $n, $rand_info, $self->{vars}, $in1->{nxt_op}
         );
     $in1->{val} = $self->get_random_value(
         $n, $rand_info, $in1->{multi_ref_var}, \$in1->{nxt_op}
@@ -632,14 +635,14 @@ sub derive_with_sub {
 
     $rand_info = $self->make_rand_info($n, $in0->{val}, $in0->{val});
     $in0->{multi_ref_var} = decide_multi_ref_var(
-        $n, $rand_info, $vars_sorted_by_value
+        $n, $rand_info, $self->{vars}
         );
 }
 
 # (*)演算子で算術式を展開.
 # 10000 以下の素数のテーブルで素因数分解
 sub derive_with_mul {
-    my ($self, $n, $vars_sorted_by_value) = @_;
+    my ($self, $n) = @_;
     my $orig_val = $n->{out}->{val};
     my $orig_type = $n->{out}->{type};
     my ($min, $max) = $self->get_type_min_max($orig_type);
@@ -653,7 +656,7 @@ sub derive_with_mul {
 
         $rand_info = $self->make_rand_info($n, $min, $max, $in1->{nxt_op});
         $in1->{multi_ref_var} = decide_multi_ref_var(
-            $n, $rand_info, $vars_sorted_by_value, $in1->{nxt_op}
+            $n, $rand_info, $self->{vars}, $in1->{nxt_op}
             );
         $in1->{val} = $self->get_random_value(
             $n, $rand_info, $in1->{multi_ref_var}, \$in1->{nxt_op}
@@ -664,7 +667,7 @@ sub derive_with_mul {
 
         $rand_info = $self->make_rand_info($n, $in0->{val}, $in0->{val});
         $in0->{multi_ref_var} = decide_multi_ref_var(
-            $n, $rand_info, $vars_sorted_by_value
+            $n, $rand_info, $self->{vars}
             );
     }
     elsif($orig_val == 1) {
@@ -680,10 +683,10 @@ sub derive_with_mul {
             $n, $in1->{val}, $in1->{val}, $in1->{nxt_op}
         );
         $in1->{multi_ref_var} = decide_multi_ref_var(
-            $n, $rand_info, $vars_sorted_by_value, $in1->{nxt_op}
+            $n, $rand_info, $self->{vars}, $in1->{nxt_op}
             );
         $in0->{multi_ref_var} = decide_multi_ref_var(
-            $n, $rand_info, $vars_sorted_by_value
+            $n, $rand_info, $self->{vars}
             );
     }
     else {
@@ -700,13 +703,13 @@ sub derive_with_mul {
 
             $rand_info = $self->make_rand_info($n, $in1->{val}, $in1->{val});
             $in1->{multi_ref_var} = decide_multi_ref_var(
-                $n, $rand_info, $vars_sorted_by_value, $in1->{nxt_op}
+                $n, $rand_info, $self->{vars}, $in1->{nxt_op}
                 );
             $in0->{val} = $orig_val;
 
             $rand_info = $self->make_rand_info($n, $in0->{val}, $in0->{val});
             $in0->{multi_ref_var} = decide_multi_ref_var(
-                $n, $rand_info, $vars_sorted_by_value
+                $n, $rand_info, $self->{vars}
                 );
         }
         else {
@@ -728,9 +731,9 @@ sub derive_with_mul {
                     ;
                 }
                 else {
-                    my $max = _max($self->{config}->get('type')->{$orig_type}->{e_max}, abs $self->{config}->get('type')->{$orig_type}->{e_min});
+                    my $max = _max($self->{conf_type}->{$orig_type}->{e_max}, abs $self->{conf_type}->{$orig_type}->{e_min});
                     my $orig_val_e = _execute_with_cache("SCALAR", \&get_exponent_of_two, abs $orig_val, $max);
-                    my $type = $self->{config}->get('type');
+                    my $type = $self->{conf_type};
                     my $type_m_bits = $type->{$orig_type}->{bits} - 1;
                     
                     if($in1->{nxt_op} =~ m/^(&|\||\^)$/ && $orig_val_e < $type_m_bits) {
@@ -812,12 +815,12 @@ sub derive_with_mul {
         $rand_info = $self->make_rand_info($n, $in1->{val}, $in1->{val});
         
         $in1->{multi_ref_var} = decide_multi_ref_var(
-            $n, $rand_info, $vars_sorted_by_value, $in1->{nxt_op}
+            $n, $rand_info, $self->{vars}, $in1->{nxt_op}
             );
         
         $rand_info = $self->make_rand_info($n, $in0->{val}, $in0->{val});
         $in0->{multi_ref_var} = decide_multi_ref_var(
-            $n, $rand_info, $vars_sorted_by_value
+            $n, $rand_info, $self->{vars} 
             );
     }
 }
@@ -876,7 +879,7 @@ sub prime_decomp {
 
 # (/) 演算子で算術式を展開.
 sub derive_with_div {
-    my ($self, $n, $orig_val, $vars_sorted_by_value) = @_;
+    my ($self, $n, $orig_val) = @_;
     my $orig_type = $n->{out}->{type};
     my ($min, $max) = $self->get_type_min_max($orig_type);
 
@@ -932,7 +935,7 @@ sub derive_with_div {
     $rand_info = $self->make_rand_info($n, $rand_min, $rand_max, $in1->{nxt_op});
 
     $in1->{multi_ref_var} = decide_multi_ref_var(
-        $n, $rand_info, $vars_sorted_by_value, $in1->{nxt_op}
+        $n, $rand_info, $self->{vars}, $in1->{nxt_op}
         );
     $in1->{val} = $self->get_random_value(
         $n, $rand_info, $in1->{multi_ref_var}, \$in1->{nxt_op}
@@ -947,13 +950,13 @@ sub derive_with_div {
 
     $rand_info = $self->make_rand_info($n, $in0->{val}, $in0->{val});
     $in0->{multi_ref_var} = decide_multi_ref_var(
-        $n, $rand_info, $vars_sorted_by_value
+        $n, $rand_info, $self->{vars}
         );
 }
 
 # %演算子で算術式を展開
 sub derive_with_mod {
-    my ($self, $n, $vars_sorted_by_value) = @_;
+    my ($self, $n) = @_;
     my $orig_val = $n->{out}->{val};
     my $orig_type = $n->{out}->{type};
     my ($min, $max) = $self->get_type_min_max($orig_type);
@@ -963,7 +966,7 @@ sub derive_with_mod {
 
     if($orig_val == 0) {
         my $rand_val = new_random_range($min, $max);
-        $self->derive_with_div($n, $rand_val, $vars_sorted_by_value);
+        $self->derive_with_div($n, $rand_val);
     }
     else {
         if($orig_val < 0) {
@@ -991,7 +994,7 @@ sub derive_with_mod {
             $n, $rand_min, $rand_max, $in1->{nxt_op}
             );
         $in1->{multi_ref_var} = decide_multi_ref_var(
-            $n, $rand_info, $vars_sorted_by_value, $in1->{nxt_op}
+            $n, $rand_info, $self->{vars}, $in1->{nxt_op}
             );
 
         $in1->{val} = $self->get_random_value(
@@ -1005,7 +1008,7 @@ sub derive_with_mod {
 
         $rand_info = $self->make_rand_info($n, $in0->{val}, $in0->{val});
         $in0->{multi_ref_var} = decide_multi_ref_var(
-            $n, $rand_info, $vars_sorted_by_value
+            $n, $rand_info, $self->{vars}
             );
     }
 }
@@ -1013,12 +1016,12 @@ sub derive_with_mod {
 # (<<|>>) 演算子で算術式を展開.
 # 2の補数表現のみ対応.
 sub derive_with_shift {
-    my ($self, $n, $vars_sorted_by_value) = @_;
+    my ($self, $n) = @_;
     my $op = $n->{otype};
     my $orig_val = $n->{out}->{val};
     my $orig_type = $n->{out}->{type};
     my ($min, $max) = $self->get_type_min_max($orig_type);
-    my $type = $self->{config}->get('type');
+    my $type = $self->{conf_type};
     my $max_bits = $type->{$orig_type}->{bits}-1;
 
     my $rand_min = 0;
@@ -1053,7 +1056,7 @@ sub derive_with_shift {
 
     $rand_info = $self->make_rand_info($n, $rand_min, $rand_max, $in1->{nxt_op});
     $in1->{multi_ref_var} = decide_multi_ref_var(
-        $n, $rand_info, $vars_sorted_by_value, $in1->{nxt_op}
+        $n, $rand_info, $self->{vars}, $in1->{nxt_op}
         );
     $in1->{val} = $self->get_random_value(
         $n, $rand_info, $in1->{multi_ref_var}, \$in1->{nxt_op}
@@ -1074,20 +1077,20 @@ sub derive_with_shift {
 
     $rand_info = $self->make_rand_info($n, $in0->{val}, $in0->{val});
     $in0->{multi_ref_var} = decide_multi_ref_var(
-        $n, $rand_info, $vars_sorted_by_value
+        $n, $rand_info, $self->{vars}, 
         );
 }
 
 # 関係演算子. $orig_val == 1 の場合の値を生成
 sub derive_with_relation {
-    my ($self, $n, $vars_sorted_by_value) = @_;
+    my ($self, $n) = @_;
     my $op = $n->{otype};
     my $orig_val = $n->{out}->{val};
     my $max_type = $self->get_max_inttype('unsigned');
-#    my $max_type = $self->{config}->get('types')->[-1];
+#    my $max_type = $self->{conf_types}->[-1];
 #    $max_type = $self->select_type($op, $max_type, $val, 0);
     my ($min, $max) = $self->get_type_min_max($max_type);
-    my $type = $self->{config}->get('type');
+    my $type = $self->{conf_type};
 
     # 以下, 演算結果が 1 として in の値を生成
     # orig_val == 0 の場合は, 演算子を反転して値を求める
@@ -1109,7 +1112,7 @@ sub derive_with_relation {
         if($op eq '<') {
             $rand_info = $self->make_rand_info($n, $min, $max-1, $in0->{nxt_op});
             $in0->{multi_ref_var} = decide_multi_ref_var(
-                $n, $rand_info, $vars_sorted_by_value, $in0->{nxt_op}
+                $n, $rand_info, $self->{vars}, $in0->{nxt_op}
                 );
 
             $in0->{val} = $self->get_random_value(
@@ -1120,7 +1123,7 @@ sub derive_with_relation {
         elsif($op eq '<=') {
             $rand_info = $self->make_rand_info($n, $min, $max, $in0->{nxt_op});
             $in0->{multi_ref_var} = decide_multi_ref_var(
-                $n, $rand_info, $vars_sorted_by_value, $in0->{nxt_op}
+                $n, $rand_info, $self->{vars}, $in0->{nxt_op}
                 );
             $in0->{val} = $self->get_random_value(
                 $n, $rand_info, $in0->{multi_ref_var}, \$in0->{nxt_op}
@@ -1130,7 +1133,7 @@ sub derive_with_relation {
         elsif($op eq '>=') {
             $rand_info = $self->make_rand_info($n, $min, $max, $in0->{nxt_op});
             $in0->{multi_ref_var} = decide_multi_ref_var(
-                $n, $rand_info, $vars_sorted_by_value, $in0->{nxt_op}
+                $n, $rand_info, $self->{vars}, $in0->{nxt_op}
                 );
             $in0->{val} = $self->get_random_value
                 ($n, $rand_info, $in0->{multi_ref_var}, \$in0->{nxt_op}
@@ -1141,7 +1144,7 @@ sub derive_with_relation {
         elsif($op eq '>') {
             $rand_info = $self->make_rand_info($n, $min+1, $max, $in0->{nxt_op});
             $in0->{multi_ref_var} = decide_multi_ref_var(
-                $n, $rand_info, $vars_sorted_by_value, $in0->{nxt_op}
+                $n, $rand_info, $self->{vars}, $in0->{nxt_op}
                 );
             $in0->{val} = $self->get_random_value(
                 $n, $rand_info, $in0->{multi_ref_var}, \$in0->{nxt_op}
@@ -1153,7 +1156,7 @@ sub derive_with_relation {
         }
 
         $in1->{multi_ref_var} = decide_multi_ref_var(
-            $n, $rand_info, $vars_sorted_by_value
+            $n, $rand_info, $self->{vars}
             );
         $in1->{val} = $self->get_random_value($n, $rand_info, $in1->{multi_ref_var});
 =comment
@@ -1175,7 +1178,7 @@ sub derive_with_relation {
         if($op eq '==') {
             $rand_info = $self->make_rand_info($n, $min, $max, $in1->{nxt_op});
             $in1->{multi_ref_var} = decide_multi_ref_var(
-                $n, $rand_info, $vars_sorted_by_value, $in1->{nxt_op}
+                $n, $rand_info, $self->{vars}, $in1->{nxt_op}
                 );
             $in1->{val} = $self->get_random_value(
                 $n, $rand_info, $in1->{multi_ref_var}, \$in1->{nxt_op}
@@ -1185,7 +1188,7 @@ sub derive_with_relation {
         elsif($op eq '!=') {
             $rand_info = $self->make_rand_info($n, $min, $max, $in1->{nxt_op});
             $in1->{multi_ref_var} = decide_multi_ref_var(
-                $n, $rand_info, $vars_sorted_by_value, $in1->{nxt_op}
+                $n, $rand_info, $self->{vars}, $in1->{nxt_op}
                 );
             $in1->{val} = $self->get_random_value(
                 $n, $rand_info, $in1->{multi_ref_var}, \$in1->{nxt_op}
@@ -1208,7 +1211,7 @@ sub derive_with_relation {
         }
 
         $in0->{multi_ref_var} = decide_multi_ref_var(
-            $n, $rand_info, $vars_sorted_by_value
+            $n, $rand_info, $self->{vars}
             );
         $in0->{val} = $self->get_random_value($n, $rand_info, $in0->{multi_ref_var});
     }
@@ -1234,11 +1237,11 @@ sub reverse_relation_op {
 
 # 論理演算子による導出
 sub derive_with_logical {
-    my ($self, $n, $vars_sorted_by_value) = @_;
+    my ($self, $n) = @_;
     my $op = $n->{otype};
     my $orig_val = $n->{out}->{val};
     my $max_type = $self->get_max_inttype('unsigned'); # temp
-    #my $max_type = $self->{config}->get('types')->[-1];
+    #my $max_type = $self->{conf_types}->[-1];
     my ($min, $max) = $self->get_type_min_max($max_type);
 
     my $in0 = $n->{in}->[0];
@@ -1253,7 +1256,7 @@ sub derive_with_logical {
         if($orig_val == 0) {
             $rand_info = $self->make_rand_info($n, $min, $max, $in1->{nxt_op});
             $in1->{multi_ref_var} = decide_multi_ref_var(
-                $n, $rand_info, $vars_sorted_by_value, $in1->{nxt_op}
+                $n, $rand_info, $self->{vars}, $in1->{nxt_op}
                 );
 
             $in1->{val} = $self->get_random_value(
@@ -1268,7 +1271,7 @@ sub derive_with_logical {
             }
 
             $in0->{multi_ref_var} = decide_multi_ref_var(
-                $n, $rand_info, $vars_sorted_by_value);
+                $n, $rand_info, $self->{vars});
 
             $in0->{val} = $self->get_random_value(
                 $n, $rand_info, $in0->{multi_ref_var});
@@ -1292,7 +1295,7 @@ sub derive_with_logical {
                 $n, $rand_min, $rand_max, $in1->{nxt_op}
                 );
             $in1->{multi_ref_var} = decide_multi_ref_var(
-                $n, $rand_info, $vars_sorted_by_value, $in1->{nxt_op}
+                $n, $rand_info, $self->{vars}, $in1->{nxt_op}
                 );
             $in1->{val} = $self->get_random_value(
                 $n, $rand_info, $in1->{multi_ref_var}, \$in1->{nxt_op}
@@ -1314,7 +1317,7 @@ sub derive_with_logical {
                 if($rand_info->{rand_min} == 0);
 
             $in0->{multi_ref_var} = decide_multi_ref_var(
-                $n, $rand_info, $vars_sorted_by_value
+                $n, $rand_info, $self->{vars}
                 );
             $in0->{val} = $self->get_random_value(
                 $n, $rand_info, $in0->{multi_ref_var}
@@ -1329,7 +1332,7 @@ sub derive_with_logical {
             $in1->{nxt_op} = $self->select_opcode_with_value($orig_val);
             $rand_info = $self->make_rand_info($n, $orig_val, $orig_val);
             $in1->{multi_ref_var} = decide_multi_ref_var(
-                $n, $rand_info, $vars_sorted_by_value, $in1->{nxt_op}
+                $n, $rand_info, $self->{vars}, $in1->{nxt_op}
                 );
             $in1->{val} = _to_big_num($max_type, 0);
 
@@ -1339,7 +1342,7 @@ sub derive_with_logical {
             $in1->{nxt_op} = $self->select_opcode_with_range($max_type, $min, $max);
             $rand_info = $self->make_rand_info($n, $min, $max, $in1->{nxt_op});
             $in1->{multi_ref_var} = decide_multi_ref_var(
-                $n, $rand_info, $vars_sorted_by_value, $in1->{nxt_op}
+                $n, $rand_info, $self->{vars}, $in1->{nxt_op}
                 );
             $in1->{val} = $self->get_random_value(
                 $n, $rand_info, $in1->{multi_ref_var}, \$in1->{nxt_op}
@@ -1374,7 +1377,7 @@ sub derive_with_logical {
         }
 
         $in0->{multi_ref_var} = decide_multi_ref_var(
-            $n, $rand_info, $vars_sorted_by_value
+            $n, $rand_info, $self->{vars}
             );
         $in0->{val} = $self->get_random_value($n, $rand_info, $in0->{multi_ref_var});
     }
@@ -1385,7 +1388,7 @@ sub derive_with_logical {
 
 # ビット演算子を用いて導出 (and, or, xor)
 sub derive_with_bit {
-    my ($self, $n, $vars_sorted_by_value) = @_;
+    my ($self, $n) = @_;
     my $op = $n->{otype};
     my $orig_type = $n->{out}->{type};
     my $orig_val  = $n->{out}->{val};
@@ -1464,11 +1467,11 @@ sub derive_with_bit {
     $in0->{nxt_op} = $self->select_opcode_with_value($in0->{val});
     $rand_info = $self->make_rand_info($n, $in0->{val}, $in0->{val});
     $in0->{multi_ref_var} = decide_multi_ref_var(
-        $n, $rand_info, $vars_sorted_by_value, $in0->{nxt_op}
+        $n, $rand_info, $self->{vars}, $in0->{nxt_op}
         );
     $rand_info = $self->make_rand_info($n, $in1->{val}, $in1->{val});
     $in1->{multi_ref_var} = decide_multi_ref_var(
-        $n, $rand_info, $vars_sorted_by_value
+        $n, $rand_info, $self->{vars}
         );
 }
 
@@ -1477,7 +1480,7 @@ sub dec2bin {
     my ($self, $res_type, $val) = @_;
     my $res = '';
     my $b = 0;
-    my $type = $self->{config}->get('type');
+    my $type = $self->{conf_type};
     my $bits = $type->{$res_type}->{bits};
     # 引数の型で表現できるかどうかのため.
     my $can_express_bits = 0;
@@ -1604,7 +1607,7 @@ sub get_type_min_max {
     my $min = 0;
     my $max = 0;
 
-    my $type = $self->{config}->get('type');
+    my $type = $self->{conf_type};
     ($min, $max) = _execute_with_cache("ARRAY", \&_get_type_min_max_without_self, $type, $res_type);
 
     return ($min, $max);
@@ -1920,7 +1923,7 @@ sub generate_float_with_precision {
 
     my $orig_float_info = {};
     unless($op =~ m/^(<|<=|==|!=|>=|>)$/) {
-        my $max = _max($self->{config}->get('type')->{$orig_type}->{e_max}, abs $self->{config}->get('type')->{$orig_type}->{e_min});
+        my $max = _max($self->{conf_type}->{$orig_type}->{e_max}, abs $self->{conf_type}->{$orig_type}->{e_min});
         my $orig_val_e = _execute_with_cache("SCALAR", \&get_exponent_of_two, abs $orig_val, $max);
         my ($orig_val_m, undef) = _execute_with_cache("ARRAY", \&get_mantissa_bin, $self, $orig_type, (abs $orig_val), $orig_val_e);
         $orig_float_info = {
@@ -2047,7 +2050,7 @@ sub get_exponent_of_two {
 # 10進数の小数の底が 2 の仮数部を 2進数で返す
 sub get_mantissa_bin {
     my ($self, $orig_type, $val, $e) = @_;
-    my $type = $self->{config}->get('type');
+    my $type = $self->{conf_type};
     my $can_express_bits = 0;
 
     if($val == 0) {
@@ -2131,7 +2134,7 @@ sub generate_float_with_add_sub {
     $only_integer = 1
         if(defined $nxt_op && $nxt_op !~ m/^(\+|-|\*|\/)$/);
 
-    my $type = $self->{config}->get('type');
+    my $type = $self->{conf_type};
     my $e_min = $type->{$orig_type}->{e_min};
     my $e_max = $type->{$orig_type}->{e_max};
     my $res_e = 0;
@@ -2318,7 +2321,7 @@ sub generate_float_with_div {
     my $res_e = 0;
     my $res_m = 0;
 
-    my $type = $self->{config}->get('type');
+    my $type = $self->{conf_type};
 
     # 指数部を生成
     my $e_min = $type->{$orig_type}->{e_min};
@@ -2384,7 +2387,7 @@ sub generate_float_with_relation {
         new_random_range($rand_info->{rand_min}, $rand_info->{rand_max});
     }
     else {
-        my $type = $self->{config}->get('type');
+        my $type = $self->{conf_type};
         my $rand_type = $rand_info->{type};
         my $e_min = $type->{$rand_type}->{e_min};
         my $e_max = $type->{$rand_type}->{e_max};
@@ -2596,7 +2599,7 @@ sub suppress_mantissa_with_rand_info {
 # 乱数の範囲に, 指数部・仮数部を抑える
 sub _get_float_info_of_rand_info {
     my ($self, $rand_info) = @_;
-    my $type = $self->{config}->get('type');
+    my $type = $self->{conf_type};
 
     my $res_type = $rand_info->{type};
     my $e_min = $type->{$res_type}->{e_min};
@@ -2605,7 +2608,7 @@ sub _get_float_info_of_rand_info {
     my $rand_min = $rand_info->{rand_min};
     my $rand_max = $rand_info->{rand_max};
 
-    my $max = _max($self->{config}->get('type')->{$res_type}->{e_max}, abs $self->{config}->get('type')->{$res_type}->{e_min});
+    my $max = _max($self->{conf_type}->{$res_type}->{e_max}, abs $self->{conf_type}->{$res_type}->{e_min});
     my $rand_min_e = _execute_with_cache("SCALAR", \&get_exponent_of_two, abs $rand_min, $max);
     my ($rand_min_m, undef) = _execute_with_cache("ARRAY", \&get_mantissa_bin, $self, $res_type, (abs $rand_min), $rand_min_e);
     my $rand_max_e = _execute_with_cache("SCALAR", \&get_exponent_of_two, abs $rand_max, $max);
@@ -2720,7 +2723,7 @@ sub generate_string {
 # 2進数に +/- 1bit する
 sub add_bit_binary {
     my ($self, $bin_type, $bin, $add_bit) = @_;
-    my $type = $self->{config}->get('type');
+    my $type = $self->{conf_type};
     my $bits = $type->{$bin_type}->{bits};
     $bits-- if($bin_type =~ m/(float|double)$/);
 
@@ -2776,7 +2779,7 @@ sub generate_mantissa {
 # 浮動小数点数型の指数部の最大・最小値を 10進数で返す
 sub get_min_max_exponent_of_ten {
     my ($self, $float_type) = @_;
-    my $type = $self->{config}->get('type');
+    my $type = $self->{conf_type};
     my $p_min = Math::BigFloat->new("$type->{$float_type}->{p_min}");
     my $p_max = Math::BigFloat->new("$type->{$float_type}->{p_max}");
 
@@ -2800,7 +2803,7 @@ sub _make_available_type_list {
 	# prec_flag ... 精度を考慮するフラグ
     my ($self, $op, $max_type, $val, $prec_flg) = @_;
     my @typelist = ();
-    my $type = $self->{config}->get('type');
+    my $type = $self->{conf_type};
     my $val_e = 0;
     my $val_m = 0;
     my $can_express_bits = 0;
@@ -2812,7 +2815,7 @@ sub _make_available_type_list {
         $can_use_integer = can_express_integer($val);
 		
 		# 2のべき乗で表した時の指数を返す(val = ● x 2 ^ x ... x を返す)
-        my $max = _max($self->{config}->get('type')->{$max_type}->{e_max}, abs $self->{config}->get('type')->{$max_type}->{e_min});
+        my $max = _max($self->{conf_type}->{$max_type}->{e_max}, abs $self->{conf_type}->{$max_type}->{e_min});
         $val_e = _execute_with_cache("SCALAR", \&get_exponent_of_two, abs $val, $max);
         
         # 仮数部を2進数で返す
@@ -2836,7 +2839,7 @@ sub _make_available_type_list {
     
     # 使用可能な型の配列を作成
     my ($min, $max) = 0;
-    for my $i (@{$self->{config}->get('types')}) {
+    for my $i (@{$self->{conf_types}}) {
         ($min, $max) = $self->get_type_min_max($i);
         
         if($type->{$i}->{order} <= $type->{$max_type}->{order}) {
@@ -2915,7 +2918,7 @@ sub can_express_integer {
 
 # 演算子ノードの {in} に型や値などを入れる
 sub set_opnodein {
-    my ($self, $n, $vars_sorted_by_value) = @_;
+    my ($self, $n) = @_;
     my $op = $n->{otype};
 
     # 型, print_value をセット. 型は導出前の変数の型
@@ -2927,7 +2930,7 @@ sub set_opnodein {
     }
 
     # 演算子ノードの in の値・演算子を決める. in0 = {val, nxt_op};
-    $self->make_opnodein($n, $vars_sorted_by_value);
+    $self->make_opnodein($n);
 
     # オペランドの値が左右入れ替わってもよい演算は入れ替え
     my $rand = int rand 9;
@@ -3044,7 +3047,7 @@ sub use_integral_promotion {
     my ($self, $n) = @_;
     my $orig_type = $n->{out}->{type};
     my $orig_val = $n->{out}->{val};
-    my $type = $self->{config}->get('type');
+    my $type = $self->{conf_type};
     my $l_type = '';
     my $r_type = '';
 
@@ -3122,7 +3125,7 @@ sub make_new_varnode {
 
         $var = {
             name_type => 'x',
-            name_num  => scalar(@{$self->{vars}}),
+            name_num  => scalar(@{$self->{vars}->{x}}),
             type      => $type,
             ival      => $val,
             val       => $val,
@@ -3131,9 +3134,10 @@ sub make_new_varnode {
             scope     => $config->get('scopes')->[rand @{$config->get('scopes')}],
             used      => 1,
         };
-        
-        #$self->_insertion_sort($var);
-        push @{$self->{vars}}, $var;
+
+        my $idx = bin_search($var->{val}, $self->{vars}->{x}, 1);
+        splice (@{$self->{vars}->{x}}, $idx, 0, $var);
+
         push @{$self->{vars_to_push}}, $var;
     }
 
@@ -3157,14 +3161,14 @@ sub _insertion_sort {
     
     my $pushed = 0;
     
-    for my $pos ( 0 .. scalar(@{$self->{vars}})-1 ) {
-        if ( $self->{vars}->[$pos]->{val} >= $var->{val} ) {
-            splice @{$self->{vars}}, $pos, 0, $var;
+    for my $pos ( 0 .. scalar(@{$self->{vars}->{x}})-1 ) {
+        if ( $self->{vars}->{x}->[$pos]->{val} >= $var->{val} ) {
+            splice @{$self->{vars}->{x}}, $pos, 0, $var;
             $pushed = 1;
             last;
         }
     }
-    push @{$self->{vars}}, $var if ( $pushed == 0 );
+    push @{$self->{vars}->{x}}, $var if ( $pushed == 0 );
 }
 
 # 選んだ変数の型が合わなければ, 必要に応じてキャストを挿入
@@ -3188,31 +3192,6 @@ sub adapt_type_of_multi_ref_var {
 #    }
 
     return $vn;
-}
-
-# 値でソートした変数の配列を更新
-sub update_sorted_vars {
-    my ($self, $vars_sorted_by_value, $added_vars_num) = @_;
-    
-    my $idx = 0;
-    my $add_var = 0;
-    for(my $i=0; $i < $added_vars_num; $i++) {
-        $add_var = $self->{vars}->[$#{$self->{vars}} - $i];
-        
-        if($add_var->{name_type} eq 'x') {
-            # 追加する index を探索
-            $idx = bin_search($add_var->{val}, $vars_sorted_by_value->{x}, 1);
-            # 要素の追加
-            splice (@{$vars_sorted_by_value->{x}}, $idx, 0, $add_var);
-        }
-        elsif($add_var->{name_type} eq 't') {
-            $idx = bin_search($add_var->{val}, $vars_sorted_by_value->{t}, 1);
-            splice (@{$vars_sorted_by_value->{t}}, $idx, 0, $add_var);
-        }
-        else {
-            Carp::croak "Invalid var: $add_var->{name_type}$add_var->{name_num}";
-        }
-    }
 }
 
 # 変数ノードの値を二分探索
@@ -3247,7 +3226,7 @@ sub bin_search {
 # 整数拡張が起こるかどうかチェック
 sub judge_integral_promotion {
     my $self = shift;
-    my $type = $self->{config}->get('type');
+    my $type = $self->{conf_type};
     my $sint_bits = $type->{'signed int'}->{bits};
 
     my $lower_type = '';
@@ -3280,7 +3259,7 @@ sub get_max_inttype{
     my ($self, $ts) = @_;
     my $type = '';
 
-    for(reverse @{$self->{config}->get('types')}) {
+    for(reverse @{$self->{conf_types}}) {
         if($_ =~ m/^$ts/) {
             $type = $_;
             last;
