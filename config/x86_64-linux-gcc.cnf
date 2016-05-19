@@ -46,9 +46,9 @@
     "unsigned long",
     "signed long long",
     "unsigned long long",
-    "float",
-    "double",
-    "long double",
+    #"float",
+    #"double",
+    #"long double",
   ],
   
   # Scopes, separated by commas
