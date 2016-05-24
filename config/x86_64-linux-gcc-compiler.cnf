@@ -26,6 +26,9 @@
         # Compiling is failed temporarily
         ;
       }
+      elsif ( $output =~ /warning/ ) {
+        last;
+      }
       elsif ( $output ne '' ) {
         # Compiling is failed
         print $output;
