@@ -392,7 +392,6 @@ sub decide_multi_ref_var {
 ################################################################################
 
     my $var_ref = undef;
-
     if($rand_info->{type} =~ m/(float|double)$/ && !defined $rand_info->{val}){
         ; # 浮動小数点の場合, 再利用されるケースはほとんどない
           # (値が全く同じなら再利用)
@@ -402,7 +401,7 @@ sub decide_multi_ref_var {
         	############# 変数の再利用の順位 #############
         	# 1. t変数
         	# 2. x変数
-        	# 3. 新規x変数 ←今は無視してｘ変数でひとくくりしている
+        	# (3. 新規x変数) ←今は無視してｘ変数でひとくくりしている
         	##############################################
             
                 $var_ref = select_multi_ref_var(
@@ -439,47 +438,66 @@ sub select_multi_ref_var {
     }
     # 乱数の範囲が指定されている場合
     elsif(defined $rand_min && defined $rand_max) {
-        # rand_min, rand_max の値を持つ index
-        my $min_idx = 0;
-        my $max_idx = 0;
 
-        $min_idx = bin_search($rand_min, $vars_sorted_by_value, 1);
+        my $rand = int(rand(10));
+        if( $rand < 1) { #最小値
+            $idx = bin_search($rand_min, $vars_sorted_by_value, 0);
+            if($idx == -1) {
+                $rand_info->{val} = $rand_min;
+            }
+        }elsif( 1 <= $rand && $rand < 2) {#最大値
+            $idx = bin_search($rand_max, $vars_sorted_by_value, 0);
+            if($idx == -1) {
+                $rand_info->{val} = $rand_max;
+            }
+        }elsif( 2 <= $rand && $rand < 3 &&  $rand_min <= -1 && -1 <= $rand_max) {#-1
+            $idx = bin_search(-1, $vars_sorted_by_value, 0);
+            if($idx == -1) {
+                $rand_info->{val} = Math::BigInt->new("-1");
+            }
+        }else {
+            # rand_min, rand_max の値を持つ index
+            my $min_idx = 0;
+            my $max_idx = 0;
 
-        #もしもってきた変数が$rand_minより小さい値だったら
-        while($min_idx <= $#$vars_sorted_by_value &&
-              $vars_sorted_by_value->[$min_idx]->{val} < $rand_min) {
-            $min_idx++;
-        }
+            $min_idx = bin_search($rand_min, $vars_sorted_by_value, 1);
 
-        if($#$vars_sorted_by_value < $min_idx) {
-            # 変数の再利用が不可能
-            $idx = -1;
-        }
-        else {
-            $min_idx = 0 if($min_idx < 0);
-            $max_idx = bin_search($rand_max, $vars_sorted_by_value, 1);
-            $max_idx = $#$vars_sorted_by_value if($#$vars_sorted_by_value < $max_idx);
+            #もしもってきた変数が$rand_minより小さい値だったら
+            while($min_idx <= $#$vars_sorted_by_value &&
+                  $vars_sorted_by_value->[$min_idx]->{val} < $rand_min) {
+                $min_idx++;
+            }
 
-            # 予約した演算子が整数だけしか使えない場合, 浮動小数点の変数は使わない
-            if(defined $nxt_op && $nxt_op !~ m/^(\+|-|\*|\/)$/) {
-#                || $op !~ m/^(\+|-|\*|\/)$/) {
-                for my $i ($min_idx .. $max_idx) {
-                    if(can_express_integer($vars_sorted_by_value->[$i]->{val})) {
-                        $idx = $i;
-                        last;
-                    }
-                    else {
-                        ;
-                    }
-                }
+            if($#$vars_sorted_by_value < $min_idx) {
+                # 変数の再利用が不可能
+                $idx = -1;
             }
             else {
-                $idx = int(rand($max_idx - $min_idx + 1)) + $min_idx;
-            }
+                $min_idx = 0 if($min_idx < 0);
+                $max_idx = bin_search($rand_max, $vars_sorted_by_value, 1);
+                $max_idx = $#$vars_sorted_by_value if($#$vars_sorted_by_value < $max_idx);
 
-            $idx = -1 if($#$vars_sorted_by_value < $idx || $idx < 0 ||
-                         $vars_sorted_by_value->[$idx]->{val} < $rand_min ||
-                         $rand_max < $vars_sorted_by_value->[$idx]->{val});
+                # 予約した演算子が整数だけしか使えない場合, 浮動小数点の変数は使わない
+                if(defined $nxt_op && $nxt_op !~ m/^(\+|-|\*|\/)$/) {
+    #                || $op !~ m/^(\+|-|\*|\/)$/) {
+                    for my $i ($min_idx .. $max_idx) {
+                        if(can_express_integer($vars_sorted_by_value->[$i]->{val})) {
+                            $idx = $i;
+                            last;
+                        }
+                        else {
+                            ;
+                        }
+                    }
+                }
+                else {
+                    $idx = int(rand($max_idx - $min_idx + 1)) + $min_idx;
+                }
+
+                $idx = -1 if($#$vars_sorted_by_value < $idx || $idx < 0 ||
+                             $vars_sorted_by_value->[$idx]->{val} < $rand_min ||
+                             $rand_max < $vars_sorted_by_value->[$idx]->{val});
+            }
         }
     }
     else {
@@ -489,7 +507,7 @@ sub select_multi_ref_var {
     # もし rand_info に一致する変数がない場合, 変数の再利用はしない
     if($idx == -1 || $#$vars_sorted_by_value < $idx ||
        ($op =~ m/^(%|<<|>>|&|\||\^)$/ && $vars_sorted_by_value->[$idx]->{type} =~ m/(float|double)$/)) {
-        return;
+        return ;
     }
     else {
         #print "\@reuse@, $vars_sorted_by_value->[$idx]->{val}\n";
@@ -568,7 +586,7 @@ sub derive_with_add {
     my ($self, $n) = @_;
     my $orig_val = $n->{out}->{val};
     my $orig_type = $n->{out}->{type};
-
+    my $dist; #変数生成の時の分布
     # 生成する乱数の最大・最小値を求める.
     my ($min, $max) = $self->get_type_min_max($orig_type);
     my $rand_min = $orig_val - $max;
@@ -586,7 +604,7 @@ sub derive_with_add {
     $rand_info = $self->make_rand_info($n, $rand_min, $rand_max, $in1->{nxt_op});
 
     # in[1]変数を再利用するかどうか決定
-    $in1->{multi_ref_var} = decide_multi_ref_var(
+     $in1->{multi_ref_var} = decide_multi_ref_var(
         $n, $rand_info, $self->{vars}, $in1->{nxt_op}
         );
 
@@ -1824,7 +1842,7 @@ sub get_random_value {
     my $res = Math::BigInt->new(0);
 	
 	# 再利用する変数が決まっている場合
-    if(defined $var) {
+    if(defined $var ) {
         $res = $var->{val};
 
         if($rand_info->{type} !~ m/(float|double)$/) {
@@ -1891,7 +1909,7 @@ sub get_random_value {
 #### edited
                 my $rand = int(rand(10));
                 if ( $rand < 1 ) { $res = $rand_info->{rand_min}; }
-                elsif ( 1 <= $rand && $rand < 2 ) { $res = $rand_info->{rand_max}; }
+                elsif ( 1 <= $rand && $rand < 2  ) { $res = $rand_info->{rand_max}; }
                 elsif ( 2 <= $rand && $rand < 3 ) { 
                     if ( $rand_info->{rand_min} <= -1 && -1 <= $rand_info->{rand_max} ) {
                         $res = -1;
