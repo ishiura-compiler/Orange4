@@ -5,6 +5,7 @@ requires 'Math::BigFloat';
 requires 'Math::BigInt::FastCalc', '== 0.30';
 requires 'Math::BigInt::GMP', '== 1.40';
 requires 'Math::BigInt::Pari', '== 1.18';
+requires 'Math::Prime::Util';
 requires 'Math::BigInt', '== 1.9997';
 requires 'Time::HiRes';
 requires 'Term::UI';
