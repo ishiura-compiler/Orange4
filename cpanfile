@@ -1,5 +1,4 @@
 requires 'perl', '5.008001';
-requires 'Carp';
 requires 'Encode';
 requires 'List::MoreUtils';
 requires 'Math::BigFloat';
