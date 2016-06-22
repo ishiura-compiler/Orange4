@@ -1,28 +1,16 @@
 requires 'perl', '5.008001';
-requires 'base';
 requires 'Carp';
-requires 'CPAN::Meta';
-requires 'Data::Dumper';
 requires 'Encode';
-requires 'FindBin';
-requires 'File::Basename';
-requires 'File::Copy';
-requires 'File::Spec';
-requires 'File::Path';
-requires 'File::Temp';
-requires 'Getopt::Long';
 requires 'List::MoreUtils';
 requires 'Math::BigFloat';
-requires 'Math::BigInt::FastCalc', '0.27';
-requires 'Math::BigInt::GMP', '1.37';
-requires 'Math::BigInt::Pari', '1.16';
-requires 'Math::BigInt';
-requires 'POSIX';
+requires 'Math::BigInt::FastCalc', '== 0.30';
+requires 'Math::BigInt::GMP', '== 1.40';
+requires 'Math::BigInt::Pari', '== 1.18';
+requires 'Math::BigInt', '== 1.9997';
 requires 'Time::HiRes';
-requires 'Test::More';
+requires 'Term::UI';
 
 on 'test' => sub {
-    requires 'List::MoreUtils', '0.33';
     requires 'Test::More', '0.98';
 };
 
