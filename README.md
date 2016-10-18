@@ -1,3 +1,5 @@
+[![build status](http://192.218.172.56/compiler/orange4/badges/master/build.svg)](http://192.218.172.56/compiler/orange4/commits/master)
+
 # NAME
 
 Orange4 - Randomtest of C compilers
