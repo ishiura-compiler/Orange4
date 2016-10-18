@@ -1,0 +1,5 @@
+before_script:
+   - cpanm --installdeps . --notest
+job1:
+  script:
+        - prove -lvr t/
