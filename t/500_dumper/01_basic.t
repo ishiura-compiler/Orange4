@@ -10,10 +10,10 @@ use Orange4::Dumper;
 subtest 'basic' => sub {
     my $dumper = Orange4::Dumper->new(
         vars  => undef,
-        roots => undef,
+        statements => undef,
     );
     isa_ok $dumper, 'Orange4::Dumper';
-    can_ok $dumper, 'vars_and_roots';
+    can_ok $dumper, 'vars_and_statements';
     can_ok $dumper, 'all';
 };
 
@@ -28,14 +28,14 @@ subtest 'dies ok' => sub {
             vars => undef,
         );
     };
-    like $@, qr/Missing mandatory parameter: roots/, 'vars only';
+    like $@, qr/Missing mandatory parameter: statements/, 'vars only';
 
     eval {
         Orange4::Dumper->new(
-            roots => undef,
+            statements => undef,
         );
     };
-    like $@, qr/Missing mandatory parameter: vars/, 'roots only';
+    like $@, qr/Missing mandatory parameter: vars/, 'statements only';
 };
 
 subtest 'bigint' => sub {

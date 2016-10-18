@@ -88,9 +88,9 @@ subtest 'basic' => sub {
 
     $generator->_init();
 
-    subtest '_generate_random_var' => sub {
+    subtest '_generate_x_var' => sub {
         my $number = 0;
-        my $var = $generator->_generate_random_var($number);
+        my $var = $generator->_generate_x_var($number);
 
         is $var->{name_type}, 'x', "name_type: $var->{name_type}";
         is $var->{name_num}, $number, "name_num: $var->{name_num}";
@@ -121,29 +121,29 @@ subtest 'basic' => sub {
         is $var->{used}, 1, "used: $var->{used}";
     };
 
-    subtest 'generate_expression' => sub {
-        subtest 'minimal expression' => sub {
-           my $node  = 0;
-           my $depth = 0;
-           $generator->{var_max} = 4;
-           $generator->generate_random_vars();
-           my $expression = $generator->generate_expression($node, $depth, undef);
+    # subtest 'generate_expression' => sub {
+    #     subtest 'minimal expression' => sub {
+    #        my $node  = 0;
+    #        my $depth = 0;
+    #        $generator->{var_max} = 4;
+    #        $generator->generate_random_vars();
+    #        my $expression = $generator->generate_expression($node, $depth, undef);
 
-           ok $expression;
-           is $expression->{ntype}, 'op', 'ok expression type';
-           ok any { $_ eq $expression->{otype} } @{$test_config->{operators}}, "ok operator";
-        };
+    #        ok $expression;
+    #        is $expression->{ntype}, 'op', 'ok expression type';
+    #        ok any { $_ eq $expression->{otype} } @{$test_config->{operators}}, "ok operator";
+    #     };
 
-        subtest 'deeply expression' => sub {
-           my $node  = 10;
-           my $depth = 10;
-           $generator->{var_max} = 4;
-           $generator->generate_random_vars();
-           my $expression = $generator->generate_expression($node, $depth, undef);
+    #     subtest 'deeply expression' => sub {
+    #        my $node  = 10;
+    #        my $depth = 10;
+    #        $generator->{var_max} = 4;
+    #        $generator->generate_random_vars();
+    #        my $expression = $generator->generate_expression($node, $depth, undef);
 
-           ok $expression;
-        };
-    };
+    #        ok $expression;
+    #     };
+    # };
 
     subtest '_generate_value' => sub {
         subtest 'bit is 0' => sub {
@@ -155,13 +155,13 @@ subtest 'basic' => sub {
         };
     };
 
-    subtest '_select_varnode' => sub {
-        $generator->{var_max} = 5;
-        $generator->generate_random_vars();
-        my $var = $generator->_select_varnode();
+    # subtest '_select_varnode' => sub {
+    #     $generator->{var_max} = 5;
+    #     $generator->generate_x_vars();
+    #     my $var = $generator->_select_varnode();
 
-        is $var->{ntype}, 'var';
-    };
+    #     is $var->{ntype}, 'var';
+    # };
 
     subtest 'define_value' => sub {
         subtest 'type is float' => sub {
@@ -169,19 +169,19 @@ subtest 'basic' => sub {
             ok $value;
         };
 
-        # subtest 'type is signed int' => sub {
-        #     my $value = $generator->define_value('signed int');
-        #     ok $value;
-        # };
-    };
-
-    subtest 'integral_promotion' => sub {
-        subtest 'smaller' => sub {
-            my $type = 'unsigned char';
-            my $got = $generator->integral_promotion($type);
-            is $got, 'signed int';
+        subtest 'type is signed int' => sub {
+            my $value = $generator->define_value('signed int');
+            ok $value;
         };
     };
+
+    # subtest 'integral_promotion' => sub {
+    #     subtest 'smaller' => sub {
+    #         my $type = 'unsigned char';
+    #         my $got = $generator->integral_promotion($type);
+    #         is $got, 'signed int';
+    #     };
+    # };
 };
 
 done_testing;
