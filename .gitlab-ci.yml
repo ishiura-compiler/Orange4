@@ -4,3 +4,5 @@ before_script:
 job1:
   script:
         - prove -lvr t/
+        - perl script/orange4 -c config/x86_64-linux-gcc.cnf -t 24
+        
