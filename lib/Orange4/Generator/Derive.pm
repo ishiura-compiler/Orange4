@@ -32,29 +32,29 @@ use constant PRIME_TABLE => [2, 3, 5, 7, 11, 13, 17, 19, 23, 29, 31, 37, 41, 43,
 sub generate_random_float {
     my ($self, $float_type, $zero_flg) = @_;
     my $res = '';
-    
+
     if($float_type =~ m/(float|double)$/) {
         my $type = $self->{config}->get('type');
-        
+
         # generate exponent
         my $e_min = $type->{$float_type}->{e_min};
         my $e_max = $type->{$float_type}->{e_max};
         my $e = int(rand($e_max - $e_min + 1)) + $e_min;
-        
+
         # generate mantissa
         $res = _generate_random_binary($type->{$float_type}->{bits}-1);
         $res = bin2dec($float_type, $res);
         $res += 1;
-        
+
         $res *= accurate_pow_of_two($float_type, $e);
         $res = 0 if($res == 1 && $zero_flg && int rand 2);
-        
+
         $res = -$res if(int rand 2);
     }
     else {
         Carp::croak "_generate_random_float can rdeceive only float types: $float_type";
     }
-    
+
     return $res;
 }
 
@@ -62,11 +62,11 @@ sub generate_random_float {
 sub _generate_random_binary {
     my $bits = shift;
     my $res = '';
-    
+
     for(1 .. $bits) {
         $res .= (int rand 2) ? '0' : '1';
     }
-    
+
     return $res;
 }
 
@@ -74,12 +74,12 @@ sub _generate_random_binary {
 sub accurate_pow_of_two {
     my ($type, $exp) = @_;
     my $res = 0;
-    
+
     $res = _execute_with_cache("SCALAR", \&_pow, 2, $exp);
 =pod
     if($exp < 0) {
         $res = Math::BigFloat->new('1');
-        
+
         for(1 .. (abs $exp)) {
             $res *= 0.5;
         }
@@ -107,7 +107,7 @@ sub make_leaf_nodes_info {
     my $l_expsize = 0;
     my $r_expsize = 0;
     $expsize--;
-    
+
     if($expsize <= 0 || $depth <= 0) {
         # 導出を終了. 変数ノードを整形
         for my $in (@{$n->{in}}) {
@@ -127,7 +127,7 @@ sub make_leaf_nodes_info {
         $l_expsize_min = $expsize - $l_expsize_max;
         $l_expsize_min = 0 if($l_expsize_min < 0);
         $l_expsize = int(($l_expsize_max - $l_expsize_min+1) * rand() + $l_expsize_min);
-        
+
         if($l_expsize > $expsize) {
             $slope_degree = int(rand 5) * 25;
             $l_expsize =int($expsize * ($slope_degree/100));
@@ -135,9 +135,9 @@ sub make_leaf_nodes_info {
         else {
             ;
         }
-        
+
         $r_expsize = $expsize - $l_expsize;
-        
+
         # 導出に使用する変数ノードをリストに追加
         for my $i (0 .. $#{$n->{in}}) {
             $node_info = {
@@ -156,7 +156,7 @@ sub make_leaf_nodes_info {
 # リーフ(変数)ノードの整形
 sub adjust_varnode {
     my $vn = shift;
-    
+
     $vn->{out}->{type} = $vn->{var}->{type};
     $vn->{out}->{val}  = $vn->{var}->{val};
     $vn->{var}->{used} = 1;
@@ -166,14 +166,14 @@ sub adjust_varnode {
 # 導出で作られた opノードを返す.
 # 受け取った変数ノードの値を解とする式を生成.
 sub derive_expression {
-    my ($self, $n) = @_;
-    
+    my ($self, $n) = @_; # $n ... 最初は展開したい t,x 変数 ?
+
     # 導出に使う演算子ノードに変換. in を作成
     $n = $self->varnode2opnode($n);
-    
+
     # オペランドを結合
     $self->set_operand($n);
-    
+
     return $n;
 }
 
@@ -182,66 +182,65 @@ sub varnode2opnode {
     my ($self, $n) = @_;
     my $orig_type = $n->{var}->{type};
     my $orig_val  = $n->{var}->{val};
-    
+
     # 導出した算術式が返す型を決定(キャストを挿入)
     $n = $self->define_derivation_var_type($n);
-    
+
     # 演算子ノードの情報(ntype, otype, $n->{out}) をセット
     # $n->{var} を削除
     set_opnode_info($n, $n->{nxt_op});
-    
-    print "$orig_val, [$n->{otype}, ($orig_type)$n->{out}->{type}] = "
-        if($self->{config}->get('debug_mode'));
-    
+
+    print "$orig_val, [$n->{otype}, ($orig_type)$n->{out}->{type}] = " if($self->{config}->get('debug_mode'));
+
     # $n->{in} の val, type, print_value をセット. (type は導出元と同じ)
     $self->set_opnodein($n);
-    
+
     print "$n->{in}->[0]->{val} $n->{otype} $n->{in}->[1]->{val};\n"
         if($self->{config}->get('debug_mode'));
     print "$n->{in}->[0]->{nxt_op} :: $n->{in}->[1]->{nxt_op};\n"
         if($self->{config}->get('debug_mode'));
-    
+
     return $n;
 }
 
 # for cast float value with integer type
 sub round_val {
     my $val = shift;
-    
+
     $val = $val->copy();
-    
+
     if($val < 0) {
         $val->bceil();
     }
     else {
         $val->bfloor();
     }
-    
+
     return $val;
 }
 
 # 1つ目の演算子の予約. 型は次の展開でキャスト
 sub select_opcode_with_range {
     my ($self, $orig_type, $rand_min, $rand_max) = @_;
-    
-    my @oplist = qw(+ + - -  * * * * / / / /);
+
+    my @oplist = qw(+ + - -  * * * * / / / /); # TODO: Config で対応できるようにしたい
     my $max_type = $self->get_max_inttype('unsigned');
     $max_type = $self->get_max_inttype('signed') if($rand_max < 0 || $rand_min < 0 && int rand 2);
     my ($max_type_min, $max_type_max) = $self->get_type_min_max($max_type); # for bit op $max_typeにはコンフィグにある最大値最小値が入っていて、それらをBigIntにするためにする。
     my ($orig_type_min, $orig_type_max) = $self->get_type_min_max($orig_type); # for mod op
     my $min_mid = $orig_type_min / 2 + 1;
     my $max_mid = int($orig_type_max / 2);
-    
+
     push(@oplist, qw(< <= == != >= > && ||))
         if(($rand_min <= 0 && 0 <= $rand_max) ||
            ($rand_min <= 1 && 1 <= $rand_max));
-    
+
     # rand_min などに含まれていれば
     push @oplist, qw(% % % % %)
         if($orig_type =~ m/signed/ &&
            (($rand_min < 0 && $min_mid <= $rand_min) ||
             (0 <= $rand_max && $rand_max <= $max_mid)));
-    
+
     # 浮動小数点数型の場合, 整数を含むかどうかチェック
     my $rand_min_int = 0;
     my $rand_max_int = 0;
@@ -253,11 +252,11 @@ sub select_opcode_with_range {
     else {
         ;
     }
-    
+
     push(@oplist, qw(<< << << << << >> >> >> >> >> & & & & & | | | | | ^ ^ ^ ^ ^))
         if(0 <= $rand_max && 0 <= $rand_max_int - $rand_min_int &&
            ($rand_min_int <= $max_type_min && $max_type_max <= $rand_max_int));
-    
+
     return $oplist[rand @oplist];
 }
 
@@ -269,25 +268,25 @@ sub select_opcode_with_value {
     $max_type = $self->get_max_inttype('signed') if($val < 0);
     my $min = $type->{$max_type}->{min};
     my $max = $type->{$max_type}->{max};
-    
+
     # config の演算子リストを使用していない
     my @oplist = qw(+ + - - * * * * / / / /);
-    
+
     # 浮動小数点数の場合, 整数型で表現できるかどうかチェック
     if(can_express_integer($val)) {
         push @oplist, qw(% % %)
             if((0 <= $val && $val*2+1 <= $max) || ($val < 0 && $min <= $val*2-1));
-        
+
         push(@oplist, qw(<< << << >> >> >> & & & | | | ^ ^ ^))
             if(0 <= $val && ($min <= $val && $val <= $max));
     }
     else {
         ;
     }
-    
+
     push(@oplist, qw(< <= == != >= > && ||))
         if($val == 0 || $val == 1);
-    
+
     return $oplist [rand @oplist];
 }
 
@@ -384,17 +383,19 @@ sub set_opnode_info {
 # 変数を再利用するかどうか決定
 sub decide_multi_ref_var {
     my ($n, $rand_info, $vars_on_path, $nxt_op) = @_;
-    
+
 #########################  変数を再利用する確率  ###############################
 
     my $prob = 1.0; # 変数を再利用する確率
-    
+                    # Config.pm への対応.
+
 ################################################################################
 
     my $var_ref = undef;
     if($rand_info->{type} =~ m/(float|double)$/ && !defined $rand_info->{val}){
         ; # 浮動小数点の場合, 再利用されるケースはほとんどない
           # (値が全く同じなら再利用)
+          # TODO : 浮動小数点への対応
     }
     else {
         if(rand() <= $prob) {
@@ -403,11 +404,11 @@ sub decide_multi_ref_var {
         	# 2. x変数
         	# (3. 新規x変数) ←今は無視してｘ変数でひとくくりしている
         	##############################################
-            
+
                 $var_ref = select_multi_ref_var(
                     $n->{otype}, $rand_info, $vars_on_path->{t}, $nxt_op
                 );
-            
+
             unless(defined $var_ref) {
                 $var_ref = select_multi_ref_var(
                     $n->{otype}, $rand_info, $vars_on_path->{x}, $nxt_op
@@ -593,7 +594,7 @@ sub derive_with_add {
     my $rand_max = $orig_val - $min;
     $rand_min = $min if($rand_min < $min);
     $rand_max = $max if($max < $rand_max);
-    
+
     my $in0 = $n->{in}->[0];
     my $in1 = $n->{in}->[1];
     my $rand_info = {};
@@ -734,12 +735,12 @@ sub derive_with_mul {
             for ( my $i = 0; ; $i++ ) {
                 $in0->{val} = _to_big_num($orig_type, 1);
                 $in1->{val} = _to_big_num($orig_type, 1);
-    
+
                 # 整数で表現できるかどうか確認
                 #my $can_express_integer = 1;
                 #$can_express_integer = can_express_integer($orig_val)
                 #    if($orig_type =~ m/(float|double)$/);
-                
+
                 # absによるオーバーフロー回避
                 my $prime_decomp_val;
                 if ( $orig_val == -9223372036854775808 ) { $prime_decomp_val= abs ($orig_val/2); }
@@ -753,7 +754,7 @@ sub derive_with_mul {
                     my $orig_val_e = _execute_with_cache("SCALAR", \&get_exponent_of_two, abs $orig_val, $max);
                     my $type = $self->{conf_type};
                     my $type_m_bits = $type->{$orig_type}->{bits} - 1;
-                    
+
                     if($in1->{nxt_op} =~ m/^(&|\||\^)$/ && $orig_val_e < $type_m_bits) {
                         $in0->{val} = $orig_val;
                         $prime_decomp_val = 1;
@@ -767,13 +768,13 @@ sub derive_with_mul {
                         my $in0_exp = $orig_val_e - $in1_exp;
                         $in1->{val} = accurate_pow_of_two($orig_type, $in1_exp);
                         $in0->{val} = accurate_pow_of_two($orig_type, $in0_exp);
-                        
+
                         my $orig_val_m = _execute_with_cache("SCALAR", \&get_mantissa_of_two, (abs $orig_val), $orig_val_e);
-                        
+
                         $prime_decomp_val = $orig_val_m;#Math::BigInt->new("$orig_val_m");
                     }
                 }
-                
+
                 # 素因数分解
                 my @primes = ();
                 if($prime_decomp_val == 0) {
@@ -782,17 +783,17 @@ sub derive_with_mul {
                 else {
                     prime_decomp($prime_decomp_val, \@primes);
                 }
-                
+
                 if($orig_val == -9223372036854775808) {
                     push @primes, 2;
                 }
-                
+
                 # 素因数のリストを 2分割して, in_val を決定.
                 @primes = List::Util::shuffle @primes;
                 my $sep = 0;
                 if($in1->{nxt_op} eq '%') {
                     $sep = $#primes / 2;
-                    
+
                     for my $i (0 .. $#primes) {
                         $in0->{val} *= $primes[$i] if($sep < $i);
                         $in1->{val} *= $primes[$i] if($i <= $sep);
@@ -800,13 +801,13 @@ sub derive_with_mul {
                 }
                 else {
                     $sep = int(rand @primes);
-                    
+
                     for my $i (0 .. $#primes) {
                         $in0->{val} *= $primes[$i] if($i <= $sep);
                         $in1->{val} *= $primes[$i] if($sep < $i);
                     }
                 }
-                
+
                 if($orig_val < 0) {
                     if($in1->{nxt_op} =~ m/^(<<|>>|&|\||\^)$/) {
                         $in0->{val} = -$in0->{val};
@@ -825,20 +826,20 @@ sub derive_with_mul {
                         }
                     }
                 }
-                
+
                 last if ( ($in0->{val} -1 != 9223372036854775807) && ($in1->{val} - 1 != 9223372036854775807) );
             }
         }
-        
+
         $rand_info = $self->make_rand_info($n, $in1->{val}, $in1->{val});
-        
+
         $in1->{multi_ref_var} = decide_multi_ref_var(
             $n, $rand_info, $self->{vars}, $in1->{nxt_op}
             );
-        
+
         $rand_info = $self->make_rand_info($n, $in0->{val}, $in0->{val});
         $in0->{multi_ref_var} = decide_multi_ref_var(
-            $n, $rand_info, $self->{vars} 
+            $n, $rand_info, $self->{vars}
             );
     }
 }
@@ -1095,7 +1096,7 @@ sub derive_with_shift {
 
     $rand_info = $self->make_rand_info($n, $in0->{val}, $in0->{val});
     $in0->{multi_ref_var} = decide_multi_ref_var(
-        $n, $rand_info, $self->{vars}, 
+        $n, $rand_info, $self->{vars},
         );
 }
 
@@ -1672,11 +1673,11 @@ sub make_rand_info {
     my $config = $self->{config};
     my $type = $config->get('type');
     my $op = $n->{otype};
-    
+
    #if ( $op eq '*' && (($rand_max - 1) == 9223372036854775807) ) { $n->{out}->{type} = 'unsigned long long' }
-    
+
     my $max_type = $n->{out}->{type};
-    
+
     $max_type = $self->get_max_inttype('unsigned')
         if($op =~ m/^(<|<=|==|!=|>=|>|&&|\|\|)$/);
 #    $max_type = $config->get('types')->[-1]
@@ -1706,7 +1707,7 @@ sub make_rand_info {
         else {
             ;
         }
-        
+
         my $bit = 0; # シフト演算用. 要調整
 
         # 関係・論理演算子を予約している場合 0|1 を返す
@@ -1828,7 +1829,7 @@ sub make_rand_info {
             $rand_info->{rand_max} = _to_big_num($res_type, $rand_max);
         }
     }
-    
+
     return $rand_info;
 }
 
@@ -1840,7 +1841,7 @@ sub get_random_value {
     my $res_type = $rand_info->{type};
     my $orig_val  = $n->{out}->{val};
     my $res = Math::BigInt->new(0);
-	
+
 	# 再利用する変数が決まっている場合
     if(defined $var ) {
         $res = $var->{val};
@@ -1907,10 +1908,11 @@ sub get_random_value {
             }
             else {
 #### edited
+# TODO : 必要ない条件は消す
                 my $rand = int(rand(10));
                 if ( $rand < 1 ) { $res = $rand_info->{rand_min}; }
                 elsif ( 1 <= $rand && $rand < 2  ) { $res = $rand_info->{rand_max}; }
-                elsif ( 2 <= $rand && $rand < 3 ) { 
+                elsif ( 2 <= $rand && $rand < 3 ) {
                     if ( $rand_info->{rand_min} <= -1 && -1 <= $rand_info->{rand_max} ) {
                         $res = -1;
                     }
@@ -1921,9 +1923,9 @@ sub get_random_value {
             }
         }
     }
-    
+
     $res = _to_big_num($res_type, $res);
-    
+
     return $res;
 }
 
@@ -2114,7 +2116,7 @@ sub _pow {
     if ($num == 2 && $e >= 0) {
         $m = $m << $e;
         return $m;
-    } 
+    }
 
     if ($e < 0) {
         $n = 1/$num;
@@ -2831,14 +2833,14 @@ sub _make_available_type_list {
     if($max_type =~ m/(float|double)$/) {
         $val = Math::BigFloat->new("$val") if((ref $val) ne 'Math::BigFloat');
         $can_use_integer = can_express_integer($val);
-		
+
 		# 2のべき乗で表した時の指数を返す(val = ● x 2 ^ x ... x を返す)
         my $max = _max($self->{conf_type}->{$max_type}->{e_max}, abs $self->{conf_type}->{$max_type}->{e_min});
         $val_e = _execute_with_cache("SCALAR", \&get_exponent_of_two, abs $val, $max);
-        
+
         # 仮数部を2進数で返す
         ($val_m, $can_express_bits) = _execute_with_cache("ARRAY", \&get_mantissa_bin, $self, $max_type, (abs $val), $val_e);
-        
+
 		# 2進数で表現した仮数部で精度が足りていないときは, 末尾が 0 か判定
         for(1 .. length $val_m) {
             if(substr($val_m, -1) eq '0') {
@@ -2854,12 +2856,12 @@ sub _make_available_type_list {
     }
     # どの型を選択した場合汎整数拡張が起こるか判定
     my ($lower_type, $upper_type) = $self->judge_integral_promotion();
-    
+
     # 使用可能な型の配列を作成
     my ($min, $max) = 0;
     for my $i (@{$self->{conf_types}}) {
         ($min, $max) = $self->get_type_min_max($i);
-        
+
         if($type->{$i}->{order} <= $type->{$max_type}->{order}) {
             if($max_type !~ m/(float|double)$/ && $i =~ m/signed/ && $can_use_integer) {
                 if($i =~ m/^signed/) {
@@ -2911,10 +2913,10 @@ sub _make_available_type_list {
             last;
         }
     }
-    
+
     Carp::croak "Can not select type with $op, $val, max type is $max_type"
         unless(@typelist);
-    
+
     return @typelist;
 }
 
@@ -3156,7 +3158,7 @@ sub make_new_varnode {
         my $idx = bin_search($var->{val}, $self->{vars}->{x}, 1);
         splice (@{$self->{vars}->{x}}, $idx, 0, $var);
 
-        push @{$self->{vars_to_push}}, $var;
+        push @{$self->{vars_to_push}}, $var;  # TODO : Generator.pmとフォーマット整える
     }
 
     # 変数ノードの形に整える
@@ -3176,9 +3178,9 @@ sub make_new_varnode {
 
 sub _insertion_sort {
     my ( $self, $var ) = @_;
-    
+
     my $pushed = 0;
-    
+
     for my $pos ( 0 .. scalar(@{$self->{vars}->{x}})-1 ) {
         if ( $self->{vars}->{x}->[$pos]->{val} >= $var->{val} ) {
             splice @{$self->{vars}->{x}}, $pos, 0, $var;
@@ -3332,11 +3334,11 @@ my %_cache;
 my $count = 0;
 sub _execute_with_cache {
     my ($type, $sub, @a) = @_;
-    
+
     if ($count == 0) {
         %_cache = ();
     }
-    
+
     if (! defined $_cache{$sub, @a}) {
         $count = ($count+1) % CACHE_CHECK_CYCLE;
         if ($type eq "ARRAY") {
@@ -3347,7 +3349,7 @@ sub _execute_with_cache {
             $_cache{$sub, @a} = &$sub(@a);
         }
     }
-    
+
     if ($type eq "ARRAY") {
         return @{$_cache{$sub, @a}};
     }
