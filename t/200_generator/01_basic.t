@@ -166,12 +166,12 @@ subtest 'basic' => sub {
     subtest 'define_value' => sub {
         subtest 'type is float' => sub {
             my $value = $generator->define_value('float');
-            ok $value;
+            ok defined $value;
         };
 
         subtest 'type is signed int' => sub {
             my $value = $generator->define_value('signed int');
-            ok $value;
+            ok defined $value;
         };
     };
 
