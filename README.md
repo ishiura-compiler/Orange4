@@ -18,10 +18,10 @@ Gakuin University <ishiura-compiler@ml.kwansei.ac.jp>
 
 Ishiura Lab. <ishiura-compiler@ml.kwansei.ac.jp>
 
-Mr. Atsushi Hashimoto
-Ms. Eriko Nagai
-Mr. Ryo Nakamura
-Prof. Nagisa Ishiura
+Mr. Atsushi Hashimoto  
+Ms. Eriko Nagai  
+Mr. Ryo Nakamura  
+Prof. Nagisa Ishiura  
 
 # INSTALLATION
 
