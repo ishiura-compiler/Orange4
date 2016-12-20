@@ -9,7 +9,7 @@ requires 'Time::HiRes';
 requires 'Term::UI';
 requires 'Carp';
 requires 'File::Spec';
-requires 'File::Term';
+requires 'File::Temp';
 requires 'File::Copy';
 requires 'File::Path';
 requires 'File::Basename';
