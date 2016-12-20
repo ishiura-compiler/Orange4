@@ -18,7 +18,7 @@ requires 'POSIX';
 requires 'Data::Dumper';
 requires 'List::Util';
 requires 'constant';
-requires 'parent'
+requires 'parent';
 
 on 'test' => sub {
     requires 'Test::More', '0.98';
