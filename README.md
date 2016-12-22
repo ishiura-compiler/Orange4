@@ -10,10 +10,10 @@ Orange4 is yet another random test system for C compilers. Although it is newer 
 Orange4 has been developed by the following persons at the compiler
 team of Ishiura Laboratory, School of science and Technology, Kwansei Gakuin University
 
-Mr. Kazuhiro Nakamura   
-Mr. Daisuke Fujiwara   
-Mr. Shogo Takakura   
-Mr. Mitsuyoshi Iwatsuji
+Mr. Kazuhiro Nakamura  
+Mr. Daisuke Fujiwara  
+Mr. Shogo Takakura  
+Mr. Mitsuyoshi Iwatsuji  
 
 Ishiura Lab. <ishiura-compiler@ml.kwansei.ac.jp>
 
