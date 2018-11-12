@@ -1,39 +1,76 @@
 +{
   debug_mode => 0,
-  
+
   # Multiplication of number of operators and expressionis
-  e_size_num => 100,
-  
+  e_size_num =>  1500,
+
+  # x配列の数(この数 + 型の種類数 の配列を生成する)
+  x_array_max => 20,
+
+  # t配列の数
+  t_array_max => 5,
+
+  # 配列の次元数の最大
+  array_dim_max => 2,
+
+  # 配列の要素数の最大
+  array_element_max => 10,
+
+  # 構造体共用体の数
+  union_struct_max => 10,
+
+  # 構造体共用体のメンバ変数の数
+  member_max => 10,
+
+  # メンバ変数が配列になる確率(割)
+  prob_array => 2,
+
+  # x割の確率で配列が生成される(割)
+  prob_struct => 2,  # x割の確率で構造体が生成される
+
+  # 構造体共用体変数の数
+  x_union_struct_var_max => 10,
+  t_union_struct_var_max => 10,
+
+  # 構造体共用体のネスト　大きすぎると変数の要素数がエラいことになる
+  nest_max => 1,
+
+  # 左辺を配列か構造体にするか
+  prob_left_var => [
+    qw(array array array array unionstruct unionstruct unionstruct unionstruct assign assign)
+  ],
+
+
   # Option of the compiler, separated by commas
   options => [ "-O0", "-O3" ],
-  
+
   # Name of C file
   source_file => 'x86_64-linux-gcc-test.c',
-  
+
   # Name of Executable file
   exec_file => 'x86_64-linux-gcc-test.out',
-  
+
   # Macro (OK) of C source
   macro_ok => 'printf("@OK@\n")',
-  
+
   # Macro (NG) of C source
   macro_ng => 'printf("@NG@ (test = " fmt ")\n",val)',
-  
+
   # Command of the compiler
-  compiler => 'gcc',
-  
+  compiler => 'gcc-4.8',
+
   # Operators, separated by spaces
   operators => [
     qw(+ + + - - - * * * * * * / / / / / / % % % % % % << << << << << << >> >> >> >> >> >> == != < > <= >= && || | | | & & & ^ ^ ^)
   ],
-  
+
   # Storage classes, separated by commas
   classes => [ "static", "" ],
-  
+
   # Modifiers, separated by commas
   # ("const" is unused in some variables.)
   modifiers => [ "const", "volatile", "const volatile", "" ],
-  
+
   # Types, separated by commas
   types => [
     "signed char",
@@ -50,14 +87,20 @@
     #"double",
     #"long double",
   ],
-  
+
   # Scopes, separated by commas
   scopes => [ "LOCAL", "GLOBAL" ],
-  
+
   # Loop variable names
   # can't use "c", "k", "t", and "x"
   loop_var_name => [ "i", "j", "l", "m", "n", "o" ],
-  
+
+  #
+  func_generate_flag => 1,
+
+  #
+  max_args_num => 10,
+
   # Details of types
   type => {
     "signed char" => {

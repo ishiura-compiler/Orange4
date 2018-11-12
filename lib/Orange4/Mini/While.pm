@@ -1,4 +1,4 @@
-package Orange4::Mini::If;
+package Orange4::Mini::While;
 
 use strict;
 use warnings;
@@ -18,7 +18,7 @@ sub new {
         func_assigns => $func_assigns,
         run          => $args{run},
         status       => $args{status},
-        backup       => Orange4::Mini::Backup->new( $vars, $assigns ),
+        backup       => Orange4::Mini::Backup->new( $vars, $assigns, $func_vars, $func_assigns ),
         minimize_var => undef,
         %args,
     }, $class;
@@ -26,26 +26,28 @@ sub new {
 
 sub tree_minimize {
     my ($self, $statements) = @_;
-
     my $update = 0;
 
-########
-# print_tree の値
-# 0 ... if 文を消して, then と else のパスが通っている方を一段上に出力する
-# 1 ... 全て出力
-# 2 ... if 文は出力し, パスが通っていない方を空にする
-# 3 ... 条件文が残っていた場合に, 代入文にする
-# 4 ... 全て出力
-########
+    ###############################################################
+    # print_tree の値
+    # 0 ... while文を消して, パスが通っている場合は一段上に出力する
+    # 1 ... 全て出力
+    # 2 ... while文は出力し, パスが通っていない場合には空にする
+    # 3 ... while文の条件文を代入文にする
+    # 4 ... 全て出力
+    ###############################################################
 
     for my $st ( @$statements ) {
-        if ( $st->{st_type} eq "if" ) {
+        if ( $st->{st_type} eq "while" ) {
             if ( $st->{print_tree} == 1 ) {
                 $st->{print_tree} = 0;
                 if ( $self->_generate_and_test ) {
                     $update = 1;
+                    if ( $st->{loop_path} == 1 ) {
+                        $self->tree_minimize($st->{statements});
+                    }
                 }
-                else {
+                elsif( $st->{loop_path} == 0 ) {
                     $st->{print_tree} = 3;
                     if ( $self->_generate_and_test ) {
                         $update = 1;
@@ -60,31 +62,31 @@ sub tree_minimize {
                         }
                     }
                 }
+                else{
+                    $st->{print_tree} = 4;
+                }
             }
             elsif ( $st->{print_tree} == 0 || $st->{print_tree} == 2 || $st->{print_tree} == 3 ) {
-                if ( $st->{exp_cond}->{val} != 0 ) {
-                    $self->tree_minimize($st->{st_then});
-                }
-                else {
-                    $self->tree_minimize($st->{st_else});
+                if ( $st->{loop_path} == 1 ) {
+                    $self->tree_minimize($st->{statements});
                 }
             }
             elsif ( $st->{print_tree} == 4 ) {
-                $self->tree_minimize($st->{st_then});
-                $self->tree_minimize($st->{st_else});
+                $self->tree_minimize($st->{statements});
             }
-            else { ; }
+            else {;}
+        }
+        elsif ( $st->{st_type} eq "if" ) {
+            $self->tree_minimize($st->{st_then});
+            $self->tree_minimize($st->{st_else});
+        }
+        elsif ( $st->{st_type} eq "switch" ){
+            for my $case ( @{$st->{cases}} ){
+                $self->tree_minimize($case->{statements});
+            }
         }
         elsif ( $st->{st_type} eq "for" ) {
             $self->tree_minimize($st->{statements});
-        }
-        elsif ( $st->{st_type} eq "while") {
-            $self->tree_minimize($st->{statements});
-        }
-        elsif ( $st->{st_type} eq "switch") {
-            for my $case (@{$st->{cases}}) {
-                $self->tree_minimize($case->{statements});
-            }
         }
         else { ; }
     }
@@ -99,7 +101,8 @@ sub _generate_and_test {
         $self->{config}, $self->{vars}, $self->{assigns}, $self->{func_vars}, $self->{func_assigns},
         run    => $self->{run},
         status => $self->{status},
-    )->_generate_and_test;
+        )->_generate_and_test;
+
 }
 
 sub _print {

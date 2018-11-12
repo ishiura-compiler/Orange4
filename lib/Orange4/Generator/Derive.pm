@@ -12,7 +12,7 @@ use Math::BigFloat;
 #use Math::BigFloat lib => 'GMP';
 use Math::Prime::Util qw/:all/;
 use List::Util;
-
+use Storable qw/dclone/;
 # perl の通常の変数で扱える最大の値
 use constant VAR_MAX => 1797693134862325;#9223372036854775807;
 
@@ -111,46 +111,76 @@ sub make_leaf_nodes_info {
     if($expsize <= 0 || $depth <= 0) {
         # 導出を終了. 変数ノードを整形
         for my $in (@{$n->{in}}) {
+            if (ref $in->{ref}->{val} ne 'ARRAY') {
+
             # cast operation
-            if($in->{ref}->{ntype} eq 'op') {
-                adjust_varnode($in->{ref}->{in}->[0]->{ref});
-            }
-            else {
-                adjust_varnode($in->{ref});
+                if($in->{ref}->{ntype} eq 'op') {
+                    adjust_varnode($in->{ref}->{in}->[0]->{ref});
+                }
+                else {
+                    adjust_varnode($in->{ref});
+                }
             }
         }
     }
     else {
         # 演算子数・式の深さを計算
         $depth--;
-        $l_expsize_max = ($depth/6)*($depth+1)*((2*$depth)+1)+1;
-        $l_expsize_min = $expsize - $l_expsize_max;
-        $l_expsize_min = 0 if($l_expsize_min < 0);
-        $l_expsize = int(($l_expsize_max - $l_expsize_min+1) * rand() + $l_expsize_min);
-
-        if($l_expsize > $expsize) {
-            $slope_degree = int(rand 5) * 25;
-            $l_expsize =int($expsize * ($slope_degree/100));
-        }
-        else {
-            ;
-        }
-
-        $r_expsize = $expsize - $l_expsize;
 
         # 導出に使用する変数ノードをリストに追加
+        my $exp_arr = [];
+        my $count = 0;
+        for my $in (@{$n->{in}}) {
+            if (ref $in->{ref}->{val} ne 'ARRAY') {
+                $count++;
+            }
+        }
+        for my $i ( 0 ..($count - 1) ){
+            my $use_expsize = $i == ($count - 1) ? $expsize : int(rand( $expsize-($count-1)-$i )) + 1;
+            push @$exp_arr, $use_expsize;
+            $expsize -= $use_expsize;
+        }
+        $exp_arr = shuffleArray($exp_arr);
+        $count = 0;
         for my $i (0 .. $#{$n->{in}}) {
-            $node_info = {
+            if (ref $n->{in}->[$i]->{val} ne 'ARRAY') {
+                # print 
+                my $use_expsize = $exp_arr->[$count];
+                $count++;
+                $node_info = {
                 # キャスト演算子が挿入されている場合を考慮
                 ref => ( $n->{in}->[$i]->{ref}->{ntype} eq 'op' ?
                          $n->{in}->[$i]->{ref}->{in}->[0]->{ref} :
                          $n->{in}->[$i]->{ref} ),
-                         expsize => ( $i==0? $l_expsize : $r_expsize ),
+                         expsize => $use_expsize,
                          depth => $depth,
-            };
-            push @$leaf_nodes, $node_info;
+                };
+                if(  $use_expsize > 0 ){
+                    push @$leaf_nodes, $node_info;
+                }
+                else{
+                    if($n->{in}->[$i]->{ref}->{ntype} eq 'op') {
+                        adjust_varnode($n->{in}->[$i]->{ref}->{in}->[0]->{ref});
+                    }
+                    else {
+                        adjust_varnode($n->{in}->[$i]->{ref});
+                    }
+                }   
+            }
         }
     }
+}
+
+sub shuffleArray {
+    my $array = shift;
+    my $len = scalar(@$array);
+
+    for(my $i = $len-1 ; $i >= 0; --$i) {
+        my $j = int( rand($i+1) );
+        next if( $i == $j );
+        @$array[$i, $j] = @$array[$j, $i];
+    }
+    return $array;
 }
 
 # リーフ(変数)ノードの整形
@@ -185,7 +215,6 @@ sub varnode2opnode {
 
     # 導出した算術式が返す型を決定(キャストを挿入)
     $n = $self->define_derivation_var_type($n);
-
     # 演算子ノードの情報(ntype, otype, $n->{out}) をセット
     # $n->{var} を削除
     set_opnode_info($n, $n->{nxt_op});
@@ -269,7 +298,7 @@ sub select_opcode_with_value {
     my $min = $type->{$max_type}->{min};
     my $max = $type->{$max_type}->{max};
 
-    # config の演算子リストを使用していない
+    # config の演算子リストを使用していない!!
     my @oplist = qw(+ + - - * * * * / / / /);
 
     # 浮動小数点数の場合, 整数型で表現できるかどうかチェック
@@ -287,7 +316,49 @@ sub select_opcode_with_value {
     push(@oplist, qw(< <= == != >= > && ||))
         if($val == 0 || $val == 1);
 
+    my $match = $self->search_func_ret_val_with_value( $val, $type );
+    my @func_oplist = ();
+    if( @$match ){
+        for my $func_num ( @$match ){
+            if( $self->{func_name_num} == -1 ){
+                push @func_oplist, "func$func_num";
+            }
+            else{
+                $self->judge_can_call($func_num, \@func_oplist);
+            }
+        }
+        if( @func_oplist ){
+            return $func_oplist [ rand @func_oplist];
+        }
+    }
+    else{ ; }
+
     return $oplist [rand @oplist];
+}
+
+# 選んだ関数の深さを見て, 呼び出せるかどうかを判定する
+sub judge_can_call {
+    my ($self, $func_num, $func_oplist) = @_;
+
+    my $max_depth = $self->{config}->get('max_depth');
+    if( $self->{func_list}->[$func_num]->{depth} >= $max_depth ){ ; }
+    else{
+        push @$func_oplist, "func$func_num";
+    }
+}
+
+#値で演算子を予約する際に, その値が関数の返り値の中にないかを探す
+sub search_func_ret_val_with_value {
+    my ($self, $val, $type) = @_;
+    my $match = []; #返り値が一致した関数が何番目のものかを記憶する配列
+
+    for my $func ( @{$self->{func_list}} ){
+        if( defined $func->{return_var} &&
+            $func->{return_var}->{val} == $val  ){
+            push @$match, $func->{st_num};
+        }
+    }
+    return $match;
 }
 
 # 導出する変数の型を決定
@@ -309,6 +380,11 @@ sub define_derivation_var_type {
     # 展開に使用する演算子に合った型を選択
     if($op =~ m/^(<|<=|==|!=|>=|>|&&|\|\|)$/) {
         $new_var_type = 'signed int';
+    }
+    elsif($op =~ /func/ ) {
+        $op =~ /func(\d+)/;
+        my $func_num = $1;
+        $new_var_type = $self->{func_list}->[$func_num]->{type};
     }
     else {
         $new_var_type = $self->select_type($op, $max_type, $val, 1);
@@ -341,6 +417,8 @@ sub insert_cast4derive {
     $child_node->{out}->{val}  = $child_node->{var}->{val}
         if(defined $child_node->{out});
     $child_node->{nxt_op} = $parent_node->{nxt_op};
+    $child_node->{elements} = $parent_node->{elements}
+        if(defined $parent_node->{elements});
 
     $child_node->{var}->{val} = _to_big_num(
         $child_node_type, $child_node->{var}->{val}
@@ -376,18 +454,18 @@ sub set_opnode_info {
 #        unless($n->{out}->{type} =~ /(float|double)$/);
 
     delete $n->{ival};
-    delete $n->{var};
+    delete $n->{var} if ($n->{otype} ne 'a');
     delete $n->{nxt_op};
 }
 
 # 変数を再利用するかどうか決定
 sub decide_multi_ref_var {
     my ($n, $rand_info, $vars_on_path, $nxt_op) = @_;
+    $DB::single = 1;
 
 #########################  変数を再利用する確率  ###############################
 
     my $prob = 1.0; # 変数を再利用する確率
-                    # Config.pm への対応.
 
 ################################################################################
 
@@ -511,19 +589,25 @@ sub select_multi_ref_var {
         return ;
     }
     else {
-        #print "\@reuse@, $vars_sorted_by_value->[$idx]->{val}\n";
         return $vars_sorted_by_value->[$idx];
     }
 }
 
 # 演算子ごとに opnode の in の型と値を生成.
 sub make_opnodein {
+
     my ($self, $n) = @_;
     my $op = $n->{otype};
     my $orig_type = $n->{out}->{type};
 
     # 各演算子に沿い導出
-    if($op eq '+') {
+    if ($op eq 'a') {
+      $self->derive_with_array($n);
+    }
+    elsif($op =~ /func/){
+        $self->derive_with_func($n, $op);
+    }
+    elsif($op eq '+') {
         $self->derive_with_add($n);
     }
     elsif($op eq '-') {
@@ -555,13 +639,10 @@ sub make_opnodein {
     }
 
     # 2つ目の演算子を予約
-    my $in0 = $n->{in}->[0];
-    my $in1 = $n->{in}->[1];
-    if(defined $in0->{nxt_op}) {
-        $in1->{nxt_op} = $self->select_opcode_with_value($in1->{val});
-    }
-    else {
-        $in0->{nxt_op} = $self->select_opcode_with_value($in0->{val});
+    for my $in ( @{$n->{in}} ){
+        if( !defined  $in->{nxt_op}  && ref $in->{val} ne 'ARRAY'){
+            $in->{nxt_op} = $self->select_opcode_with_value( $in->{val} );
+        }
     }
 }
 
@@ -581,6 +662,31 @@ sub swap_opnodein {
 # 4. 乱数の幅を考慮した変数を決定(再利用 OR 新規)
 # 5. 値が決定される
 ####################################################################
+
+sub derive_with_func {
+    my ($self, $n, $op) = @_;
+    my $orig_val = $n->{out}->{val};
+    my $orig_type = $n->{out}->{type};
+    $op =~ /func(\d+)/;
+    my $func_num = $1;
+    my $rand_info = {};
+
+    for my $in ( @{$n->{in}} ){
+        if (ref $in->{val} ne 'ARRAY') {
+            $in->{nxt_op} = $self->select_opcode_with_value( $in->{val} );
+       }
+    }
+}
+
+sub derive_with_array {
+    my ($self, $n) = @_;
+
+    for my $in (@{$n->{in}}) {
+      $in->{nxt_op} = $self->select_opcode_with_value($in->{val});
+        my $rand_info = $self->make_rand_info($n, $in->{val}, $in->{val});
+        $in->{multi_ref_var} = decide_multi_ref_var( $n, $rand_info, $self->{vars} );
+    }
+}
 
 # +演算子で算術式を導出する
 sub derive_with_add {
@@ -898,6 +1004,7 @@ sub prime_decomp {
 
 # (/) 演算子で算術式を展開.
 sub derive_with_div {
+
     my ($self, $n, $orig_val) = @_;
     my $orig_type = $n->{out}->{type};
     my ($min, $max) = $self->get_type_min_max($orig_type);
@@ -969,12 +1076,12 @@ sub derive_with_div {
 
     $rand_info = $self->make_rand_info($n, $in0->{val}, $in0->{val});
     $in0->{multi_ref_var} = decide_multi_ref_var(
-        $n, $rand_info, $self->{vars}
-        );
+        $n, $rand_info, $self->{vars} );
 }
 
 # %演算子で算術式を展開
 sub derive_with_mod {
+
     my ($self, $n) = @_;
     my $orig_val = $n->{out}->{val};
     my $orig_type = $n->{out}->{type};
@@ -1482,7 +1589,6 @@ sub derive_with_bit {
     # 2進数(string) を 10進数(BigInt, BigFloat) に変換
     $in0->{val} = bin2dec($orig_type, $in0->{val});
     $in1->{val} = bin2dec($orig_type, $in1->{val});
-
     $in0->{nxt_op} = $self->select_opcode_with_value($in0->{val});
     $rand_info = $self->make_rand_info($n, $in0->{val}, $in0->{val});
     $in0->{multi_ref_var} = decide_multi_ref_var(
@@ -2210,8 +2316,6 @@ sub generate_float_with_add_sub {
             my $prec_max_e = 0;
             $prec_min_e = $orig_float_info->{exponent} - $type_m_bits;
             $prec_max_e = $orig_float_info->{exponent} + $right_zero_num - 1;
-            #print "$prec_max_e, $orig_float_info->{exponent}\n";
-            #$prec_max_e = $orig_float_info->{exponent};
 
             # rand_info の最大・最小にあわせる
             (undef, $prec_min_e, $prec_max_e, $rand_info) = $self->suppress_exponent_with_rand_info(
@@ -2913,7 +3017,6 @@ sub _make_available_type_list {
             last;
         }
     }
-
     Carp::croak "Can not select type with $op, $val, max type is $max_type"
         unless(@typelist);
 
@@ -2938,15 +3041,68 @@ sub can_express_integer {
 
 # 演算子ノードの {in} に型や値などを入れる
 sub set_opnodein {
+
     my ($self, $n) = @_;
     my $op = $n->{otype};
 
     # 型, print_value をセット. 型は導出前の変数の型
-    for my $i (0 .. 1) {
-        $n->{in}->[$i]->{type} = $n->{out}->{type};
-        $n->{in}->[$i]->{val}  = $n->{out}->{val};
-        $n->{in}->[$i]->{print_value} = 0
-            unless(defined $n->{in}->[$i]->{print_value});
+    if( $op =~ /func/ ){
+        $op =~ /func(\d+)/;
+        my $func_num = $1;
+        my $fixed_args_flag = $self->{func_list}->[$func_num]->{fixed_args_flag};
+        my $i = 0;
+        if ($fixed_args_flag == 0) {
+            $n->{in}->[$i]->{type} = $n->{out}->{type};
+            $n->{in}->[$i]->{val}  = $#{$self->{func_list}->[$func_num]->{args_list}} + 1;
+            $n->{in}->[$i]->{print_value} = 0
+                unless(defined $n->{in}->[$i]->{print_value});
+                $i++;
+        }
+        my $arg_count = 0;
+        for my $arg (@{$self->{func_list}->[$func_num]->{args_list}}) {
+            if (ref $arg->{val} ne 'ARRAY') {
+                $n->{in}->[$i]->{type} = $n->{out}->{type};
+                $n->{in}->[$i]->{val}  = $arg->{val};
+                $n->{in}->[$i]->{print_value} = 0
+                    unless(defined $n->{in}->[$i]->{print_value});
+            } else {
+                if ($self->{func_list}->[$func_num]->{called_flag} == 0) {
+                    my $arg_clone = dclone $arg;
+                    $arg_clone->{name_type} = 'x';
+                    $arg_clone->{name_num} = $self->{xvar_count};
+                    $self->{xvar_count}++;
+                    push @{$self->{vars_to_push}}, $arg_clone;
+                    $n->{in}->[$i] = $arg_clone;
+                    $self->{called_struct_args}->[$func_num]->[$arg_count] = $arg_clone;
+                    push @{$self->{x_arrays}->{$arg->{type}}}, $arg_clone if ()
+                }   
+                else {
+                    $n->{in}->[$i] = $self->{called_struct_args}->[$func_num]->[$arg_count];
+                    # push @{$n->{called_struct_args}}, $self->{called_struct_args}->[$func_num]->[$arg_count];
+                }
+                $arg_count++;
+            }
+            $i++;
+        }
+        $self->{func_list}->[$func_num]->{called_flag} = 1;
+        
+    }
+    elsif ($op eq 'a') {
+      my @e = grep {$_ =~ /^[0-9]{1,}$/} @{$n->{elements}};
+      for my $i (0 .. $#e) {
+          $n->{in}->[$i]->{type} = $n->{out}->{type};
+          $n->{in}->[$i]->{val}  = $e[$i];
+          $n->{in}->[$i]->{print_value} = 0
+              unless(defined $n->{in}->[$i]->{print_value});
+      }
+    }
+    else {
+      for my $i (0 .. 1) {
+          $n->{in}->[$i]->{type} = $n->{out}->{type};
+          $n->{in}->[$i]->{val}  = $n->{out}->{val};
+          $n->{in}->[$i]->{print_value} = 0
+              unless(defined $n->{in}->[$i]->{print_value});
+      }
     }
 
     # 演算子ノードの in の値・演算子を決める. in0 = {val, nxt_op};
@@ -2973,11 +3129,13 @@ sub set_operand {
     my ($self, $n) = @_;
 
     # オペランドの変数ノードを作成
-    my ($left, $right) = $self->make_operand($n);
+    my $operands = $self->make_operand($n);
 
     # 演算子ノードに変数ノードをつなぐ.
-    $n->{in}->[0]->{ref} = $left;
-    $n->{in}->[1]->{ref} = $right;
+    for my $i (0..$#{$operands}) {
+      $n->{in}->[$i]->{ref} = $operands->[$i];
+    }
+
 }
 
 # オペランドの変数ノードを生成
@@ -2985,18 +3143,18 @@ sub make_operand {
     my ($self, $n) = @_;
     my $op = $n->{otype};
 
+    my $operands = [];
+
     # 演算子ノードのオペランドの型を決める
-    my ($l_type, $r_type) = $self->define_operand_type($n);
+    my $o_types = $self->define_operand_type($n);
 
-    my $left  = $self->make_new_varnode($n->{in}->[0], $l_type, $op);
-    my $right = $self->make_new_varnode($n->{in}->[1], $r_type, $op);
-
-    for my $i (@{$n->{in}}) {
-        delete $i->{multi_ref_var};
-        delete $i->{nxt_op};
+    for my $i (0..$#{$o_types}) {
+      push @$operands, $self->make_new_varnode($n->{in}->[$i], $o_types->[$i], $op);
+      delete $n->{in}->[$i]->{multi_ref_var};
+      delete $n->{in}->[$i]->{nxt_op};
     }
 
-    return ($left, $right);
+    return $operands;
 }
 
 # オペランドの型を選択. 汎整数拡張を考慮.
@@ -3004,29 +3162,60 @@ sub define_operand_type {
     my ($self, $n) = @_;
     my $op = $n->{otype};
     my $orig_type = $n->{out}->{type};
-    my $in0_val = $n->{in}->[0]->{val};
-    my $in1_val = $n->{in}->[1]->{val};
+    # my $in0_val = $n->{in}->[0]->{val};
+    # my $in1_val = $n->{in}->[1]->{val};
     my $l_type = '';
     my $r_type = '';
     my $max_type = $self->get_max_inttype('unsigned');
+    my $o_types = [];
+
 
     # 型変換を考慮
     if($op =~ m/^(\+|-|\*|\/|%|&|\||\^)$/) {
         ($l_type, $r_type) = $self->define_types4arithmetic_type_convertion($n);
+        push @$o_types, $l_type;
+        push @$o_types, $r_type;
     }
     elsif($op =~ m/^(>>|<<)$/) {
         $l_type = $orig_type;
-        $r_type = $self->select_type($op, $max_type, $in1_val, 0);
+        $r_type = $self->select_type($op, $max_type, $n->{in}->[1]->{val}, 0);
+        push @$o_types, $l_type;
+        push @$o_types, $r_type;
     }
     elsif($op =~ m/^(>|>=|==|!=|<|<=|&&|\|\|)$/) {
-        $l_type = $self->select_type($op, $max_type, $in0_val, 1);
-        $r_type = $self->select_type($op, $max_type, $in1_val, 1);
+        $l_type = $self->select_type($op, $max_type, $n->{in}->[0]->{val}, 1);
+        $r_type = $self->select_type($op, $max_type, $n->{in}->[1]->{val}, 1);
+        push @$o_types, $l_type;
+        push @$o_types, $r_type;
+    }
+    elsif($op eq 'a') {
+      for my $in(@{$n->{in}}) {
+        my $type = 'signed int';
+        push @$o_types, $type;
+      }
+    }
+    elsif( $op =~ /func/ ){
+        my $count = 0;
+        $op =~ /func(\d+)/;
+        my $func_num = $1;
+        my $args_num = $#{$self->{func_list}->[$func_num]->{args_list}};
+
+        #可変引数の関数だった場合は第一引数が引数の数になる
+        if( $self->{func_list}->[$func_num]->{fixed_args_flag} == 0 ){
+            my $type = 'signed int';
+            push @$o_types, $type;
+        }
+
+        for my $i ( 0 .. $#{$self->{func_list}->[$func_num]->{args_list}} ){
+                my $type = $self->{func_list}->[$func_num]->{args_list}->[$i]->{type};
+                push @$o_types, $type;
+        }
     }
     else {
         Carp::croak "Invalid opcode: $op";
     }
 
-    return ($l_type, $r_type);
+    return $o_types;
 }
 
 # 通常の型変換を利用
@@ -3131,7 +3320,11 @@ sub make_new_varnode {
     if(defined $in->{multi_ref_var}) {
         ;
     }
+    elsif (ref $in->{val} eq 'ARRAY') {
+        return $in;
+    }
     else {
+      $var = 0;
         my $config = $self->{config};
 
         # ラップアラウンドを起こす値の生成
@@ -3143,23 +3336,44 @@ sub make_new_varnode {
             ;
         }
 
-        $var = {
+        my $rand = random_select($config->get('prob_ref_node'));
+
+        #確率で配列, 配列が参照できない場合は構造体共用体を参照, それもできなければ新たにx変数を生成
+        if( $rand eq 'array'  && defined $self->{x_arrays}->{$type} ) {
+          $var = $self->make_new_varnode_for_array($val, $type);
+        }
+        elsif ( $rand eq 'unionstruct' && defined $self->{x_struct_vars}->{$type} ) {
+          $var = $self->make_new_varnode_for_struct($val, $type);
+        }
+        if($var == 0) {
+
+          $var = {
             name_type => 'x',
-            name_num  => scalar(@{$self->{vars}->{x}}),
+            name_num  => $self->{xvar_count},
             type      => $type,
             ival      => $val,
             val       => $val,
+            elements  => undef,
             class     => $config->get('classes')->[rand @{$config->get('classes')}],
             modifier  => $config->get('modifiers')->[rand @{$config->get('modifiers')}],
             scope     => $config->get('scopes')->[rand @{$config->get('scopes')}],
             used      => 1,
-        };
+            replace_flag => 0,
+            used_count => undef,
+          };
+          $self->{xvar_count}++;
+        }
 
+        #新たに生成したx変数を変数リストに格納
         my $idx = bin_search($var->{val}, $self->{vars}->{x}, 1);
         splice (@{$self->{vars}->{x}}, $idx, 0, $var);
-
-        push @{$self->{vars_to_push}}, $var;  # TODO : Generator.pmとフォーマット整える
+        if (!(defined $var->{elements})) {
+          push @{$self->{vars_to_push}}, $var;
+        }  # TODO : Generator.pmとフォーマット整える
     }
+
+    #配列ならば次の演算子はaで配列の添字を展開
+    $in->{nxt_op} = 'a' if ( $self->check_elements($var->{elements}) );
 
     # 変数ノードの形に整える
     my $varnode = {
@@ -3168,6 +3382,7 @@ sub make_new_varnode {
         out => { type => $var->{type}, val => $var->{val} },
         nxt_op => $in->{nxt_op},
     };
+    $varnode->{elements} = $var->{elements} if ($in->{nxt_op} eq 'a');
 
     # 変数の再利用時, 型が合わなければ必要に応じてキャストを挿入
     $varnode = $self->adapt_type_of_multi_ref_var($varnode, $type, $op)
@@ -3175,6 +3390,116 @@ sub make_new_varnode {
 
     return $varnode;
 }
+
+sub random_select {
+    my $resource = shift;
+
+    my $index = rand @$resource;
+
+    return $resource->[$index];
+}
+
+#配列かどうかチェック(構造体共用体と区別するため)
+sub check_elements {
+  my ($self, $elements) = @_;
+  if (defined $elements )
+  {
+    for my $ele (@$elements)
+    {
+      unless ($ele =~ /^[0-9]{1,}$/)
+      {
+          return 0;
+      }
+    }
+  }
+  else
+  {
+    return 0;
+  }
+  return 1;
+}
+
+#構造体共用体のメンバを参照
+sub make_new_varnode_for_struct {
+  my ($self, $val, $type) = @_;
+  my $var = 0;
+
+  #一度も参照されていないメンバを参照
+  if (scalar @{$self->{x_struct_vars}->{$type}} > 0) {
+    my $rand = int(rand @{$self->{x_struct_vars}->{$type}});
+    my $ival = $self->{x_struct_vars}->{$type}->[$rand- 1]->{ival}; # これしないとリファレンス関連でバグる
+    $var = $self->{x_struct_vars}->{$type}->[$rand - 1];
+    ${$var->{ival}} = $val;
+    $var->{ival} = $var->{val} = $val;
+    splice(@{$self->{x_struct_vars}->{$type}}, $rand - 1, 1);
+  }
+  else{
+    ;
+  }
+
+  return $var;
+}
+
+#配列の要素を参照
+sub make_new_varnode_for_array {
+  my ($self, $val, $type) = @_;
+  # 空の配列の要素を探す
+  for my $array ( @{ $self->{x_arrays}->{$type} } ) {
+
+    unless ( $array->{elements}->[0] <= $array->{used_count}->[0] ) {
+
+      my @used_count = @{$array->{used_count}};
+      my $used = \@used_count;
+      my $var =  {
+        name_type => $array->{name_type},
+        name_num  => $array->{name_num},
+        elements  => $used,
+        type      => $array->{type},
+        ival      => $val,
+        val       => $val,
+        class     => $array->{class},
+        modifier  => $array->{modifier},
+        scope     => $array->{scope},
+        replace_flag => 0,
+        used      => 1,
+    };
+    $self->update_elements($array, $array->{val}, $array->{used_count}, 0, $val);
+
+    return $var;
+    }
+  }
+  return 0;
+}
+# フラグと値の更新
+sub update_elements {
+  my ($self, $array, $elements, $used_count, $ele_num, $val) = @_;
+
+  if (defined $array->{elements}->[$ele_num + 1]) {
+    $self->update_elements($array, $elements->[$used_count->[$ele_num]], $used_count, $ele_num + 1, $val);
+    if ($array->{elements}->[$ele_num] <= $used_count->[$ele_num]) {
+      if ($ele_num == 0) {
+        return;
+      } else {
+            $used_count->[$ele_num] = 0;
+        $used_count->[$ele_num - 1]++;
+      }
+    }
+  } else {
+    $elements->[$used_count->[$ele_num]] = $val;
+    if ($array->{elements}->[$ele_num] - $used_count->[$ele_num] == 1) {
+      if ($ele_num == 0) {
+        $used_count->[$ele_num - 1]++;
+        return;
+      } else {
+        $used_count->[$ele_num] = 0;
+        $used_count->[$ele_num - 1]++;
+      }
+    } else {
+      $used_count->[$ele_num]++;
+    }
+  }
+}
+
 
 sub _insertion_sort {
     my ( $self, $var ) = @_;

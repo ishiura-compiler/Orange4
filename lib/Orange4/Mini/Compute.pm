@@ -3,6 +3,7 @@ package Orange4::Mini::Compute;
 use strict;
 use warnings;
 use Carp ();
+use Data::Dumper;
 
 use Orange4::Mini::Util;
 # use Orange4::Mini::Expect;
@@ -12,12 +13,14 @@ use Orange4::Runner::Compiler;
 use Orange4::Runner::Executor;
 
 sub new {
-    my ( $class, $config, $vars, $assigns, %args ) = @_;
-    
+    my ( $class, $config, $vars, $assigns, $func_vars, $func_assigns, %args ) = @_;
+
     bless {
         config    => $config,
         vars      => $vars,
         assigns   => $assigns,
+        func_assigns => $func_assigns,
+        func_vars => $func_vars,
         run       => $args{run},
         status    => $args{status},
         backup    => Orange4::Mini::Backup->new( $vars, $assigns ),
@@ -28,7 +31,7 @@ sub new {
 
 sub dump_test {
     my ( $self, $assigns_i, $recompute ) = @_;
-    
+
     $self->{backup}->_backup_var_and_assigns;
     for my $i ( $assigns_i .. $#{ $self->{assigns} } ) {
         my $assign_i = $self->{assigns}->[$i];
@@ -46,36 +49,36 @@ sub dump_test {
             }
         }
     }
-    
+
     return $self->_generate_and_test;
 }
 
 sub _type_value_compute {
     my ( $self, $assign_i_root ) = @_;
-    
+
     $self->{generator}->type_compute($assign_i_root);
     Orange4::Mini::Expect::value_compute( $assign_i_root, $self->{vars},
         $self->{config}, $self->{status}->{avoide_undef} );
-    
+
     return ( $assign_i_root->{out}->{val} eq "UNDEF" ) ? 2 : 0;
 }
 
 sub _type_insadd_value_compute {
     my ( $self, $assign_i_root ) = @_;
-    
+
     $self->{generator}->type_compute($assign_i_root);
     $self->insadd_value($assign_i_root);
     Orange4::Mini::Expect::value_compute( $assign_i_root, $self->{vars},
         $self->{config}, $self->{status}->{avoide_undef} );
-    
+
     return ( $assign_i_root->{out}->{val} eq "UNDEF" ) ? 2 : 0;
 }
 
 sub _tvar_update_after_compute {
     my ( $self, $i ) = @_;
-    
+
     my $assign_i = $self->{assigns}->[$i];
-    
+
     # re-store the expected value of the expression that was minimized to the variable table
     $self->varset_val_reset( "t", $i, $assign_i->{root}->{out}->{type},
         'UNCHANGE', $assign_i->{root}->{out}->{val} );
@@ -84,7 +87,7 @@ sub _tvar_update_after_compute {
 
 sub _insadd_value_preparation_compute {
     my ( $self, $ref_in0 ) = @_;
-    
+
     if ( $ref_in0->{ref}->{ntype} eq 'op' ) {
         if ( $ref_in0->{print_value} == 0 ) {
             $self->{generator}->type_compute( $ref_in0->{ref} );
@@ -96,16 +99,16 @@ sub _insadd_value_preparation_compute {
     else {
         Carp::croak("Unexpectedly ntype: $ref_in0->{ref}->{ntype}");
     }
-    
+
     return $ref_in0->{ref}->{out}->{val};
 }
 
 sub _insadd_value_compute_value {
     my ( $self, $ref, $value0, $value ) = @_;
-    
+
     my $type   = $ref->{in}->[1]->{ref}->{out}->{type};
     my $value1 = Math::BigInt->new(0);
-    
+
     if    ( $ref->{otype} eq '+' ) { $value1 = $value - $value0; }
     elsif ( $ref->{otype} eq '*' ) { $value1 = $value / $value0; }
     else {
@@ -118,13 +121,13 @@ sub _insadd_value_compute_value {
         my $max   = Math::BigInt->new( $types->{$type}->{max} );
         $value1 = $value1 % ( $max + 1 );
     }
-    
+
     return $value1;
 }
 
 sub _insadd_value_compute {
     my ( $self, $ref ) = @_;
-    
+
     my $value  = $ref->{out}->{val};
     my $value0 = $self->_insadd_value_preparation_compute( $ref->{in}->[0] );
     if ( $value0 eq 'UNDEF' ) { $value = $value0; return; }
@@ -141,7 +144,7 @@ sub _insadd_value_compute {
 # re-calculate the value of the variable that was made by ins_add
 sub insadd_value {
     my ( $self, $ref ) = @_;
-    
+
     if ( $ref->{ntype} eq 'op' ) {
         for my $r ( @{ $ref->{in} } ) {
             if ( $r->{print_value} == 0 ) {
@@ -160,7 +163,7 @@ sub insadd_value {
 
 sub varset_val_reset {
     my ( $self, $name_type, $name_num, $type, $ival, $val ) = @_;
-    
+
     for my $var ( @{ $self->{vars} } ) {
         if ( $name_type eq $var->{name_type} && $name_num eq $var->{name_num} ) {
             $var->{type} = $type eq 'UNCHANGE' ? $var->{type} : $type;
@@ -178,7 +181,7 @@ sub varset_val_reset {
 
 sub _tval_compute_assigns {
     my ( $self, $modify_t_num ) = @_;
-    
+
     my $exist;
     for my $i ( ( $modify_t_num + 1 ) .. ( @{ $self->{assigns} } - 1 ) ) {
         my $assign_i = $self->{assigns}->[$i];
@@ -196,13 +199,12 @@ sub _tval_compute_assigns {
             }
         }
     }
-    
+
     return 0;
 }
 
 sub tval_compute {
     my ( $self, $i ) = @_;
-    print "aaaaa\n";
     <STDIN>;
     # return UNDEF ? 2 : 0;
     # return EXIST ? 1 : 0;
@@ -212,27 +214,27 @@ sub tval_compute {
 # re-store the var from the variable table in var present in the assign
 sub reset_tvar_and_compute_exist {
     my ( $self, $begin_number, $number ) = @_;
-    
+
     my $assign_var_locate = [];
     my $name = 't' . $number;
     my $exist = $self->_search_range_assigns_var( $begin_number, $name, $assign_var_locate );
-    
+
     for my $var ( @{ $self->{vars} } ) {
         my $var_name = $var->{name_type} . $var->{name_num};
         if ( $var_name eq $name ) {
             $self->_put_assign_var( $assign_var_locate, $var );
         }
     }
-    
+
     return $exist;
 }
 
 sub _search_range_assigns_var {
     my ( $self, $begin_number, $name, $assign_var_locate ) = @_;
-    
+
     my $assigns     = $self->{assigns};
     my $exist_total = 0;
-    
+
     for my $i ( $begin_number .. $#{$assigns} ) {
         my $assign_i = $assigns->[$i];
         if ( Orange4::Mini::Util::_check_assign($assign_i) ) {
@@ -242,13 +244,13 @@ sub _search_range_assigns_var {
             $exist_total += $exist;
         }
     }
-    
+
     return $exist_total;
 }
 
 sub _generate_and_test {
     my $self = shift;
-    
+
     if ( defined $self->{status}->{mode}
             && ( $self->{status}->{mode} eq 'optimize'
               || $self->{status}->{mode} eq 'volatile' )
@@ -258,10 +260,10 @@ sub _generate_and_test {
     }
     else {
         my $time_out = $self->{status}->{time_out};
+        $self->_generate_test_program;
         eval {
             local $SIG{ALRM} = sub { die "timeout" };
             alarm($time_out);
-            $self->_generate_test_program;
             $self->_compile;
             if ( $self->{generate_test}->{compile_error_msg} eq 0 ) {
                 $self->_execute;
@@ -272,10 +274,9 @@ sub _generate_and_test {
         if ( $@ =~ /timeout/ ) {
             $self->_print("WARNING: TIMEOUT! ($time_out [s])");
             $self->{status}->{program} = "FAILED MINIMIZE. (TIME OUT)";
-            
+
             return 0;
         }
-        
         return $self->_judgement_and_print;
     }
 }
@@ -293,9 +294,25 @@ sub _assign_put {
     }
 }
 
+sub _assign_put_for_func {
+    my $self = shift;
+
+    for my $func_count ( 0 .. $#{ $self->{func_assigns} } ){
+        for my $assign_count ( 0 .. $#{ $self->{func_assigns}->[$func_count] } ) {
+            my $assign_i = $self->{func_assigns}->[$func_count]->[$assign_count];
+            if ( Orange4::Mini::Util::_check_assign($assign_i) ) {
+                $assign_i->{var}->{val} = $assign_i->{val} =
+                    $assign_i->{root}->{out}->{val};
+                $assign_i->{var}->{type} = $assign_i->{type} =
+                    $assign_i->{root}->{out}->{type};
+            }
+        }
+    }
+}
+
 sub _put_statements_from_assign {
     my ($self, $statements) = @_;
-    
+
     foreach my $st (@$statements ) {
         if ( $st->{st_type} eq 'for' ) {
             $self->_put_statements_from_assign($st->{statements});
@@ -303,6 +320,14 @@ sub _put_statements_from_assign {
         elsif ( $st->{st_type} eq 'if' ) {
             $self->_put_statements_from_assign($st->{st_then});
             $self->_put_statements_from_assign($st->{st_else});
+        }
+        elsif ( $st->{st_type} eq 'while' ) {
+            $self->_put_statements_from_assign($st->{statements});
+        }
+        elsif ( $st->{st_type} eq 'switch' ) {
+            for my $case ( @{$st->{cases}} ) {
+                $self->_put_statements_from_assign( $case->{statements} );
+            }
         }
         elsif ( $st->{st_type} eq 'assign' ) {
             my $assigns_num = $st->{assigns_num};
@@ -316,24 +341,68 @@ sub _put_statements_from_assign {
     }
 }
 
+sub _put_statements_from_assign_for_func {
+    my ($self, $statements, $i) = @_;
+
+    foreach my $st (@$statements ) {
+        if ( $st->{st_type} eq 'for' ) {
+            $self->_put_statements_from_assign_for_func($st->{statements}, $i);
+        }
+        elsif ( $st->{st_type} eq 'if' ) {
+            $self->_put_statements_from_assign_for_func($st->{st_then}, $i);
+            $self->_put_statements_from_assign_for_func($st->{st_else}, $i);
+        }
+        elsif ( $st->{st_type} eq 'while' ) {
+            $self->_put_statements_from_assign_for_func($st->{statements}, $i);
+        }
+        elsif ( $st->{st_type} eq 'switch' ) {
+            for my $case ( @{$st->{cases}} ) {
+                $self->_put_statements_from_assign_for_func( $case->{statements}, $i );
+            }
+        }
+        elsif ( $st->{st_type} eq 'assign' ) {
+            my $assigns_num = $st->{array_num};
+            $st->{root}            = $self->{func_assigns}->[$i]->[$assigns_num]->{root};
+            $st->{val}             = $self->{func_assigns}->[$i]->[$assigns_num]->{val};
+            $st->{type}            = $self->{func_assigns}->[$i]->[$assigns_num]->{type};
+            $st->{var}             = $self->{func_assigns}->[$i]->[$assigns_num]->{var};
+            $st->{print_statement} = $self->{func_assigns}->[$i]->[$assigns_num]->{print_statement};
+        }
+        else {;}
+    }
+}
+
 sub _generate_test_program {
     my $self = shift;
-    
+
     $self->_assign_put;
+    $self->_assign_put_for_func;
+
     $self->_put_statements_from_assign($self->{generator}->{statements});
-    
+    my $count = 0;
+    for my $func ( @{$self->{generator}->{func_list}} ) {
+        $self->_put_statements_from_assign_for_func($func->{statements}, $count);
+        $count++;
+    }
+
     my $generator = Orange4::Generator::Program->new( $self->{config} );
-    $generator->generate_program( $self->{vars}, $self->{generator}->{statements} );
+    $generator->generate_program( $self->{vars},
+                                  $self->{generator}->{unionstructs},
+                                  $self->{generator}->{func_list},
+                                  $self->{func_vars},
+                                  $self->{generator}->{statements},
+                                  $self->{generator}->{replace_vars},
+        );
     $self->{generate_test}->{program} = $generator->program;
 }
 
 sub _compile {
     my $self     = shift;
-    
+
     my $compiler = Orange4::Runner::Compiler->new(
         compile => $self->{run}->{compiler}->{compile},
         config  => $self->{config},
-        option  => $self->{status}->{option},
+        compile_command => $self->{status}->{compile_command},
     );
     if ( $self->{status}->{debug} ) {
         $compiler->run;
@@ -350,7 +419,7 @@ sub _compile {
 
 sub _execute {
     my $self     = shift;
-    
+
     my $executor = Orange4::Runner::Executor->new(
         config  => $self->{config},
         execute => $self->{run}->{executor}->{execute},
@@ -371,7 +440,7 @@ sub _execute {
 
 sub _judgement_and_print {
     my $self = shift;
-    
+
     if ( !$self->{generate_test}->{execute_error} ) {
         $self->_print("");
     }
@@ -380,31 +449,31 @@ sub _judgement_and_print {
     {
         $self->_error_header;
         $self->{status}->{program} = $self->{generate_test}->{program};
-        
+
         return 1;
     }
-    
+
     return 0;
 }
 
 sub _error_header {
     my $self = shift;
-    
+
     my $compile_command = $self->{generate_test}->{compile_command};
     my $compile_message = $self->{generate_test}->{compile_error_msg};
     my $execute_command = $self->{generate_test}->{execute_command};
     my $execute_message = $self->{generate_test}->{execute_error_msg};
-    
+
     my ( $expression_size, $assign_max, $var_max ) = (
         $self->{status}->{exp_size},
         $self->{status}->{root_size},
         $self->{status}->{var_size}
     );
-    
+
     if ( $compile_message eq '0' )    { $compile_message = ""; }
     if ( !defined($execute_command) ) { $execute_command = ""; }
     if ( !defined($execute_message) ) { $execute_message = ""; }
-    
+
     my $header = <<"...";
 /*
 ( E_SIZE, NUM_ROOT, NUM_VAR ) = ( $expression_size, $assign_max, $var_max )
@@ -415,25 +484,25 @@ $compile_message
 $execute_message
 */
 ...
-    
+
     $self->{status}->{header} = $header;
 }
 
 sub _search_assign_var {
     my ( $self, $ref, $name, $s, $assign_var_locate ) = @_;
-    
+
     return Orange4::Mini::Util::search_assign_var( $ref, $name, $s, $assign_var_locate );
 }
 
 sub _put_assign_var {
     my ( $self, $assign_var_locate, $v ) = @_;
-    
+
     Orange4::Mini::Util::put_assign_var( $self->{assigns}, $assign_var_locate, $v );
 }
 
 sub _print {
     my ( $self, $body ) = @_;
-    
+
     Orange4::Mini::Util::print( $self->{status}->{debug}, $body );
 }
 

@@ -1,8 +1,8 @@
 +{
   compile => sub {
-    my ( $config, $option ) = @_;
+    my ( $config, $compiler_and_option) = @_;
     
-    my $command = "$config->{compiler} $config->{source_file} -o $config->{exec_file} $option -Wno-format -w";
+    my $command = "$compiler_and_option $config->{source_file} -o $config->{exec_file} -Wno-format -w";
     my $error   = 0;
     
     while (1) {

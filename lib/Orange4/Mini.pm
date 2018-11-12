@@ -15,6 +15,9 @@ use Orange4::Config;
 use Orange4::Log;
 use Orange4::Mini::Executor;
 use Orange4::Util;
+use Time::HiRes qw( usleep gettimeofday tv_interval );
+
+use Data::Dumper;
 
 sub new {
     my ( $class, %args ) = @_;
@@ -57,6 +60,7 @@ sub run {
     $self->_collect_targets;
     $self->_init;
     
+
     for my $file ( @{ $self->{target_files} } ) {
         my $guard = Orange4::Util::Chdir->new( $self->{target_directory} );
         $self->{content} = do $file or Carp::croak("Cannot load $file");

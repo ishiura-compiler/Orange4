@@ -1,40 +1,93 @@
 +{
-  debug_mode => 0,
-  
-  # Multiplication of number of operators and expressionis
+
+debug_mode => 0,
+
+  # Multiplication of number of operators  and expressionis
   e_size_num => 1000,
+
+  # main以外の関数を生成するかどうか
+  func_generate_flag => 1,
+  # 引数の数
+  max_args_num => 10,
+  # 関数の数
+  max_funcs_num => 10,
+  # 関数の深さ
+  max_depth => 2,
+
+  # 配列を生成するかどうか
+  generate_array_flag => 1,
+  # x配列の最大数(この数以下の数からランダム + 型の種類数 の配列を生成する)
+  x_array_max => 10,
+  # t配列の最大数(この数以下の数からランダム + 型の種類数 の配列を生成する)
+  t_array_max => 10,
+  # 配列の次元数の最大
+  array_dim_max => 2,
+  # 配列の要素数の最大
+  array_element_max => 10,
+  # 可変長配列を生成する確率 => 0.2,
+
+  # 構造体共用体型枠の最大数
+  max_structs => 10,
+  max_unions => 5,
+  # 構造体共用体のメンバ変数の最大数
+  member_max => 10,
+  # メンバ変数が配列になる確率(割)
+  prob_array => 1,
+  prob_struct => 2,  # x割の確率で構造体が生成される
+  # 構造体共用体変数の数
+  x_union_struct_var_max => 5,
+  t_union_struct_var_max => 5,
+  # 構造体共用体のネスト 大きすぎると変数の要素数がエラいことになる
+  nest_max => 1,
+
+  # expression_size 中の左辺添字式の割合
+  tarray_expression_size => 0.2,
+
+  # 左辺を配列か構造体にするか
+  prob_left_var => [
+    qw(array array array unionstruct unionstruct unionstruct assign assign assign assign)
+  ],
   
-  # Option of the compiler, separated by commas
-  options => [ "-O0", "-O3" ],
+  # 関数の引数の種類
+  prob_func_arg => [
+    qw(var var var var var var struct array)
+  ],
+
+  # ノードを新規x変数にするか配列・構造体共用体を参照するか
+  prob_ref_node => [
+    qw(array array unionstruct unionstruct var var var var var var var)
+  ],
+
+  # 代入文のうち可変配列が生成される割合
+  prob_vla => 0,
   
   # Name of C file
-  source_file => 'linux-gcc-test.c',
-  
+  source_file => 'x86_64-linux-gcc-test.c',
+
   # Name of Executable file
-  exec_file => 'linux-gcc-test.out',
-  
+  exec_file => 'x86_64-linux-gcc-test.out',
+
   # Macro (OK) of C source
   macro_ok => 'printf("@OK@\n")',
-  
+
   # Macro (NG) of C source
-  macro_ng => 'printf("@NG@ ("test" = " fmt ")\n",val)',
-  
-  # Command of the compiler
-  compiler => 'gcc',
-  
+  macro_ng => 'printf("@NG@ (test = " fmt ")\n",val)',
+
+  # Command of the compiler with option
+  compile_commands => ["gcc -O0", "gcc -O3", "clang -O0",  "clang -O3"],
+
   # Operators, separated by spaces
   operators => [
     qw(+ + + - - - * * * * * * / / / / / / % % % % % % << << << << << << >> >> >> >> >> >> == != < > <= >= && || | | | & & & ^ ^ ^)
   ],
-  
+
   # Storage classes, separated by commas
-  classes => [ "static", "", "", "", "" ],
+  classes => [ "static", "" ],
 
   # Modifiers, separated by commas
   # ("const" is unused in some variables.)
-  modifiers =>
-    [ "const", "volatile", "const volatile", "" ],
-  
+  modifiers => [ "const", "volatile", "const volatile", "" ],
+
   # Types, separated by commas
   types => [
     "signed char",
@@ -51,14 +104,14 @@
     #"double",
     #"long double",
   ],
-  
+
   # Scopes, separated by commas
   scopes => [ "LOCAL", "GLOBAL" ],
-  
+
   # Loop variable names
   # can't use "c", "k", "t", and "x"
   loop_var_name => [ "i", "j", "l", "m", "n", "o" ],
-  
+
   # Details of types
   type => {
     "signed char" => {

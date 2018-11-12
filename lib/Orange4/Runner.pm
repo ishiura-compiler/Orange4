@@ -37,9 +37,9 @@ sub new {
 
 sub parse_options {
     my $self = shift;
-    
+
     local @ARGV = @_;
-    
+
     GetOptions(
         "c|config:s" => \$self->{config_file},
         "h|help"     => \$self->{help},
@@ -47,30 +47,30 @@ sub parse_options {
         "s|seed:i"   => \$self->{start_seed},
         "t|time:f"   => \$self->{time},
     ) or _usage();
-    
+
     if ( $self->{count} && $self->{time} ) {
         Carp::croak("Cannot enable 'count' and 'time' option");
     }
-    
+
     if ( $self->{help} ) {
         _usage();
     }
-    
+
     $self->{argv} = [@ARGV];
 }
 
 sub run {
     my $self = shift;
-    
+
     $self->_validate;
     $self->_load_config_file;
     $self->_init;
-    
+
     my @ng_seeds = ();
-    
+
     my ( $start_seed, $count, $time ) =
         ( $self->{start_seed}, $self->{count}, $self->{time} );
-    
+
     for my $seed ( $start_seed .. $start_seed + $count - 1 ) {
         srand($seed);
         $self->{seed} = $seed;
@@ -98,11 +98,11 @@ sub run {
 
 sub _validate {
     my $self = shift;
-    
+
     unless ( $self->{time} || $self->{count} ) {
         $self->{count} = 1;
     }
-    
+
     if ( $self->{time} ) {
         $self->{count} = MAX_TEST_COUNT;
     }
@@ -110,7 +110,7 @@ sub _validate {
 
 sub _load_config_file {
     my $self = shift;
-    
+
     my $config_file = $self->{config_file};
     if ( defined($config_file) ) {
         if ( -e $config_file ) {
@@ -140,9 +140,9 @@ sub _load_config_file {
         else {
             Carp::croak("Load default config file, but .orangerc.cnf does not exist");
         }
-    
+
     }
-    
+
     my $file = $config_file;
     $file =~ s/\.cnf$//;
     my $compiler_cnf = "$file-compiler.cnf";
@@ -157,11 +157,11 @@ sub _load_config_file {
 
 sub _copy_config {
     my $self = shift;
-    
+
     my $file = $self->{config_file};
-    
+
     $file =~ s/\.cnf$//;
-    
+
     my %config_files = (
         basic    => $self->{config_file},
         compiler => "$file-compiler.cnf",
@@ -172,7 +172,7 @@ sub _copy_config {
         compiler => File::Spec->catfile( $self->{log_dir}, 'Orange4-compiler.cnf' ),
         executor => File::Spec->catfile( $self->{log_dir}, 'Orange4-executor.cnf' ),
     );
-    
+
     for my $key ( keys %config_files ) {
         File::Copy::copy( $config_files{$key}, $target_paths{$key} )
             or Carp::croak("Cannot copy to $target_paths{$key}");
@@ -181,85 +181,93 @@ sub _copy_config {
 
 sub _randomtest {
     my $self = shift;
-    
     my $config = $self->{config};
-    
     my $test_ng = 0;
-    
-    my ( $varset, $statements ) = $self->_generate_vars_and_statements;
-    
+    my $seed = $self->{seed};
+
+    my ( $varset, $structs, $statements, $func_list, $func_vars ) = $self->_generate_vars_and_statements;
+
     my $generator = Orange4::Generator::Program->new($config);
-    $generator->generate_program( $varset, $statements );
-    
-    for my $option ( @{ $config->get('options') } ) {
+    $generator->generate_program( $varset, $structs, $func_list, $func_vars, $statements);
+
+    for my $compile_command ( @{ $config->get('compile_commands')}) {
+
         my $compiler = Orange4::Runner::Compiler->new(
-            compile => $self->{compiler}->{compile},
-            config  => $config,
-            option  => $option,
+                compile => $self->{compiler}->{compile},
+                config  => $config,
+                compile_command => $compile_command,
         );
         $compiler->run();
-        
+
         my $executor = Orange4::Runner::Executor->new(
-            config  => $self->{config},
-            execute => $self->{executor}->{execute},
+                config  => $self->{config},
+                execute => $self->{executor}->{execute},
         );
         if ( $compiler->error_msg eq 0 ) { #TODO msg should be undef or ''
             $executor->run;
         }
+
         if ( $compiler->error_msg ne 0 || $executor->error != 0 ) {
+
             my $header = $self->_error_header(
                 $compiler->command, $compiler->error_msg,
                 $executor->command, $executor->error_msg,
             );
-            my $seed = $self->{seed};
-	    if($compiler->error_msg =~ /Compile-timeout/){
-		Orange4::Log->new(
-                	name => "error$seed\_$option\_Compile-timeout.c",
-                	dir  => $self->{log_dir}
-            	)->print( $header . $generator->program );
-	    }
-	    elsif($executor->error_msg =~ /Executor-timeout/) {
-            	Orange4::Log->new(
-                	name => "error$seed\_$option\_Executor-timeout.c",
-                	dir  => $self->{log_dir}
-            	)->print( $header . $generator->program );
+            my $error_compile_command = $compile_command;
+            $error_compile_command =~ s/ /_/;
+                
+            if($compiler->error_msg =~ /Compile-timeout/){
+                Orange4::Log->new(
+                    name => "error$seed\_$error_compile_command\_Compile-timeout.c",
+                    dir  => $self->{log_dir}
+                )->print( $header . $generator->program );
+            }
+            elsif($executor->error_msg =~ /Executor-timeout/) {
+                Orange4::Log->new(
+                    name => "error$seed\_$error_compile_command\_Executor-timeout.c",
+                    dir  => $self->{log_dir}
+                )->print( $header . $generator->program );
             }
             else {
-		Orange4::Log->new(
-                	name => "error$seed\_$option.c",
-                	dir  => $self->{log_dir}
-            	)->print( $header . $generator->program );
+                Orange4::Log->new(
+                    name => "error$seed\_$error_compile_command.c",
+                    dir  => $self->{log_dir}
+                )->print( $header . $generator->program );
             }
-            
+
             my $content = Orange4::Dumper->new(
                 vars  => $varset,
                 statements => $statements,
-                )->all(
+                unionstructs => $structs,
+                func_list  => $func_list,
+                func_vars  => $func_vars
+            )->all(
                 expression_size => $self->{generator}->expression_size,
                 root_size       => $self->{generator}->root_max,
                 var_size        => $self->{generator}->var_max,
-                option          => $option
-                );
+                compile_command        => $compile_command,
+            );
+
             if($compiler->error_msg =~ /Executor-timeout/){
-		Orange4::Log->new(
-		    name => "error$seed\_$option\_Executor-timeout.pl",
-		    dir  => $self->{log_dir}
-		    )->print($content);
-	    }
-	    elsif($executor->error_msg =~ /Compile-timeout/) {
-		Orange4::Log->new(
-		    name => "error$seed\_$option\_Compile-timeout.pl",
-		    dir  => $self->{log_dir}
-		    )->print($content);
-	    }
-	    else {
-		Orange4::Log->new(
-		    name => "error$seed\_$option.pl",
-		    dir  => $self->{log_dir}
-		    )->print($content);
-	    }
-	    $test_ng = 1;
-	}
+                Orange4::Log->new(
+                    name => "error$seed\_$error_compile_command\_Executor-timeout.pl",
+                    dir  => $self->{log_dir}
+                )->print($content);
+            }
+            elsif($executor->error_msg =~ /Compile-timeout/) {
+                Orange4::Log->new(
+                    name => "error$seed\_$error_compile_command\_Compile-timeout.pl",
+                    dir  => $self->{log_dir}
+                )->print($content);
+            }
+            else {
+                Orange4::Log->new(
+                    name => "error$seed\_$error_compile_command.pl",
+                    dir  => $self->{log_dir}
+                )->print($content);
+            }
+            $test_ng = 1;
+        }
         else {
             print " ";
         }
@@ -272,29 +280,29 @@ sub _randomtest {
 
 sub _init {
     my $self = shift;
-    
+
     $self->{start_time} = time;
-    
+
     my $base = _log_name( $self->{start_time} );
     $self->{log_dir} = File::Spec->catfile( $self->{log_dir}, $base );
-    
+
     unless ( -d $self->{log_dir} ) {
         File::Path::mkpath( [ $self->{log_dir} ], 0, oct(777) );
     }
-    
+
     $self->_copy_config();
 }
 
 sub _generate_vars_and_statements {
     my $self = shift;
-    
+
     $self->{generator} = Orange4::Generator->new(
         seed   => $self->{seed},
         config => $self->{config},
     );
     $self->{generator}->run;
-    
-    return ( $self->{generator}->{vars}, $self->{generator}->{statements} );
+
+    return ( $self->{generator}->{vars}, $self->{generator}->{unionstructs}, $self->{generator}->{statements}, $self->{generator}->{func_list}, $self->{generator}->{func_vars} );
 }
 
 sub _error_header {
@@ -302,13 +310,13 @@ sub _error_header {
         $self, $compile_command, $compile_message,
         $execute_command, $execute_message
     ) = @_;
-    
+
     my ( $expression_size, $root_max, $var_max ) = (
         $self->{generator}->expression_size,
         $self->{generator}->root_max,
         $self->{generator}->var_max
     );
-    
+
     my $header_message = "";
     if ( defined $compile_command ) {
         chomp($compile_command);
@@ -326,7 +334,7 @@ sub _error_header {
         chomp($execute_message);
         $header_message .= "$execute_message\n";
     }
-    
+
     my $header = <<"...";
 /*
 SIZE=$expression_size NUM=$root_max, VAR_NUM=$var_max
@@ -341,7 +349,7 @@ $header_message
 
 sub _log_name {
     my $time = shift;
-    
+
     return POSIX::strftime "%Y%m%d-%H%M%S", localtime($time);
 }
 

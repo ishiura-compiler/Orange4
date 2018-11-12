@@ -19,6 +19,8 @@ requires 'Data::Dumper';
 requires 'List::Util';
 requires 'constant';
 requires 'parent';
+requires 'Smart::Comments';
+requires 'Clone';
 
 on 'test' => sub {
     requires 'Test::More', '0.98';

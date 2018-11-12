@@ -42,12 +42,12 @@ sub _check_config {
     
     my $caution = "";
     $caution .= $self->_check_config_e_size_num;
-    $caution .= $self->_check_config_options;
+    # $caution .= $self->_check_config_options;
     $caution .= $self->_check_config_source_file;
     $caution .= $self->_check_config_exec_file;
     $caution .= $self->_check_config_macro_ok;
     $caution .= $self->_check_config_macro_ng;
-    $caution .= $self->_check_config_compiler;
+    $caution .= $self->_check_config_compiler_commands;
     $caution .= $self->_check_config_operators;
     $caution .= $self->_check_config_classes;
     $caution .= $self->_check_config_modifiers;
@@ -212,17 +212,26 @@ sub _check_config_operators {
     return "";
 }
 
-sub _check_config_compiler {
+sub _check_config_compiler_commands {
     my $self = shift;
-    if ( !defined $self->{compiler} || $self->{compiler} eq "" ) {
+
+    if ( !defined $self->{compile_commands} || $self->{compile_commands} eq "" ) {
         return _c_msg("Undefined source_file.");
     }
-    elsif ( system "which $self->{compiler} > /dev/null" ) {
-        return _c_msg("Compiler Command '$self->{compiler}' is not found.");
-    }
     else {
-        return "";
+        my $options = [];
+        for my $compile_command ( @{ $self->{compile_commands} } ) {
+            my ($compiler, $option) = split(/ /, $compile_command);
+            if ($option eq "") { return _c_msg("Undefined options. '$compiler'");} 
+            push @$options, $option;
+            if ( system "which $compiler > /dev/null" ) {
+                return _c_msg("Compiler Command '$compiler' is not found.");
+            }
+        }
+        $self->{options} = $options;
+        $self->_check_config_options;
     }
+    return "";
 }
 
 sub _check_config_macro_ng {

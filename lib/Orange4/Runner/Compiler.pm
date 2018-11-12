@@ -5,7 +5,7 @@ use warnings;
 
 sub new {
     my ( $class, %args ) = @_;
-    
+
     bless {
         error_msg => "",
         command   => "",
@@ -15,13 +15,16 @@ sub new {
 
 sub run {
     my $self = shift;
-    
+
     system "rm -f $self->{config}->{exec_file} > /dev/null";
     eval {
 	local $SIG{ALRM} = sub { die "timeout" };
-	alarm 5;   #If you wanna set timeout of compile, change here. (default 5sec)
+	alarm 300;   #If you wanna set timeout of compile, change here. (default 5sec)
 	( $self->{error_msg}, $self->{command} ) =
-	    $self->{compile}->( $self->{config}, $self->{option} );
+	    $self->{compile}->( $self->{config},  $self->{compile_command});
+  if( $self->{error_msg} ne "" ){
+      die;
+  }
 	alarm 0;
     };
     alarm 0;
